@@ -43,14 +43,24 @@ All of this is redone from the stored text, without fetching, by `--reparse`
   flags a text that disagrees with the site's field; `pay_all` lists every amount in the text.
   A single figure is stored as exact (min = max) unless the text says "up to".
 - Currency (`pay_currency`, `pay_currency_source`): the site's field, or the code/symbol next to
-  the amount ("30 CAD/hour", "CAD $30", "€15", "US$35"). A bare "$" with no code is recorded as
-  USD and marked "assumed" (shown as `USD?` on the page). "$/hr equiv." converts only USD,
+  the amount in the text ("30 CAD/hour", "CAD $30", "$35–$60 USD", "€15"). When the site's pay
+  field has no currency, the text is searched for one; if neither names it, a bare "$" is
+  recorded as USD and marked "assumed" (shown as `USD?`). "$/hr equiv." converts only USD,
   yearly pay at 2,080 h and monthly at 173 h.
+- No figure: `pay_note` says what the listing says instead ("paid per task, amount not stated",
+  "rate varies…", "compensation shared later", "competitive"), `pay_text` quotes it.
 - Kind of job (`contract_type`, `contract_evidence`): contractor (freelance, independent
   contractor, 1099, per task), temporary (temporary, fixed-term, an end date, W-2 through a
-  staffing agency), permanent (an employee post on a company board with no contract or end date
-  mentioned) or internship. Read from the title first, then the site's employment-type field,
-  then the text; on platforms where all work is freelance, that is the fallback. Blank = not stated.
+  staffing agency), internship, or permanent only when the listing says so ("permanent",
+  "full-time employee") or lists employee benefits (401(k), health/dental, paid time off,
+  equity, pension...). Anything else is `contractor?` (shown "contract (assumed)").
+- Where (`places.py`): `work_mode` (remote / hybrid / onsite), `location_rule`
+  ("only listed places" = the listing or site says you must be there; "anywhere"; "must come on
+  site"; "listed place, rule not stated" = a place is listed but not said to be required),
+  `allowed_places`, `excluded_places`, and `location_evidence` (the sentence or site field).
+  Site eligibility lists come first (Mercor, Outlier, Handshake = US only), then sentences such
+  as "must be based in…", "available within Canada", "Location: Remote (US, UK…)",
+  "authorized to work in…". Preferences ("we prefer people living in…") are not rules.
 - Years of experience: the smallest "N years" in a sentence about experience; years that are
   only "preferred" / "nice to have" are marked so. The quoted sentence is shown next to it.
 - Degrees: degrees *mentioned* in the text, required or not.

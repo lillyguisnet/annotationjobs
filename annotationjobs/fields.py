@@ -8,7 +8,8 @@ import json
 from pathlib import Path
 
 from .common import RAW_ROOT, degrees_in, experience
-from .terms import best_pay, engagement, pay_mentions
+from .places import location_info
+from .terms import best_pay, engagement, pay_mentions, pay_unstated
 
 # What each platform says about all its work, used only when a listing itself says nothing.
 SITE_DEFAULT = {
@@ -96,9 +97,12 @@ def derive(r, board):
     if site:
         lo, hi, unit = site["min"], site["max"], site["unit"]
         cur, cur_src = site["currency"], "site field"
-        if not cur:  # site shows "$" with no code
-            if best and best["currency"] != "USD" and best["unit"] == unit:
-                cur, cur_src = best["currency"], "text (site shows no currency)"
+        if not cur:  # site shows "$" with no code: does the text name the currency?
+            named = [m for m in mentions if m["explicit_currency"]]
+            match = [m for m in named if m["unit"] == unit and abs(m["max"] - hi) < 0.01] or \
+                    [m for m in named if m["unit"] == unit] or named
+            if match:
+                cur, cur_src = match[0]["currency"], "text: …" + match[0]["quote"][:120] + "…"
             else:
                 cur, cur_src = "USD", "assumed: site shows $ with no currency code"
         src = "site field"
@@ -112,13 +116,16 @@ def derive(r, board):
             note = f"text also says {_fmt(best)}"
     elif best:
         lo, hi, cur, unit = best["min"], best["max"], best["currency"], best["unit"]
-        src, cur_src = "text", "text"
+        src = "text"
+        cur_src = "text" if best["explicit_currency"] else "assumed: text shows $ with no currency code"
         others = {_fmt(m) for m in mentions if m["near_pay_word"] and m["unit"] and best_pay([m])} - {_fmt(best)}
         if others:
             note = "other amounts in the text: " + "; ".join(sorted(others)[:4])
     else:
         lo = hi = cur = unit = None
         src = cur_src = ""
+        note, quote = pay_unstated(text)
+        r["pay_text"] = quote
     r.update(pay_min=lo, pay_max=hi, pay_currency=cur or "", pay_unit=unit or "", pay_source=src,
              pay_currency_source=cur_src, pay_note=note)
     if src == "text" or (best and not r.get("pay_text")):
@@ -128,8 +135,10 @@ def derive(r, board):
     structured = r.get("employment_type") or next((x.get(k) for k in STRUCTURED_TYPE_KEYS if x.get(k)), "")
     if not structured and r["source"].startswith("lever-"):
         structured = r.get("commitment") or ""
+    comp = (x.get("compensation") or {}).get("compensationTierSummary") or ""  # e.g. "CA$215K – CA$295K • Offers Equity"
     r["contract_type"], r["contract_evidence"] = engagement(
-        r["title"], text, structured, board.get("kind", ""), SITE_DEFAULT.get(r["source"], ""))
+        r["title"], text + ("\n" + comp if comp else ""), structured, board.get("kind", ""), SITE_DEFAULT.get(r["source"], ""))
+    r.update(location_info(r))
     # years and degrees (degrees from a site badge, e.g. Handshake, are kept)
     r["min_years_experience"], r["experience_text"] = experience(text)
     if not r.get("degrees_from_site"):

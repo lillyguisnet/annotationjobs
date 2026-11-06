@@ -28,6 +28,7 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
 .err{color:var(--warn);font-size:12px;max-width:420px;white-space:pre-wrap}
 .cur{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:0 3px}.cur.nonusd{color:var(--warn);border-color:var(--warn)}
 .note{font-size:11.5px;color:var(--warn);max-width:220px;white-space:normal}
+.assumed{opacity:.75;font-style:italic}.wm-remote{background:#e8f0fb}.wm-onsite{background:#fbe9e3}.wm-hybrid{background:#f4eefb}
 .ct-contractor{background:#e3f4ea}.ct-temporary{background:#fdf0dc}.ct-permanent{background:#e3ecfd}.ct-internship{background:#efe6fb}
 @media (prefers-color-scheme:dark){.ct-contractor{background:#1e3a2a}.ct-temporary{background:#3d3020}.ct-permanent{background:#1f2c45}.ct-internship{background:#30254a}}
 </style></head><body>
@@ -41,10 +42,13 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
  <label>Paid per<select id="unit"><option value="">Any</option><option value="hour">Hour</option><option value="task">Task</option><option value="year">Year</option><option value="month">Month</option><option value="none">Not stated</option></select></label>
  <label>Currency<select id="cur"><option value="">Any</option><option>USD</option><option>CAD</option><option>EUR</option><option>GBP</option><option value="other">Other</option></select></label>
  <label>Top pay ≥ (US$/hr equiv.)<input id="minpay" type="number" min="0" step="5" style="width:95px"></label>
- <label>Kind of job<select id="ctype"><option value="">Any</option><option value="contractor">Contractor / freelance</option><option value="temporary">Temporary / fixed-term</option><option value="permanent">Permanent employee</option><option value="internship">Internship</option><option value="none">Not stated</option></select></label>
+ <label>Kind of job<select id="ctype"><option value="">Any</option><option value="contractor">Contractor / freelance (incl. assumed)</option><option value="temporary">Temporary / fixed-term</option><option value="permanent">Permanent employee</option><option value="internship">Internship</option><option value="none">Not stated</option></select></label>
  <label>Years asked ≤<input id="maxyrs" type="number" min="0" style="width:70px" placeholder="any"></label>
  <label>Degree mentioned<select id="deg"><option value="">Any</option><option>PhD</option><option>MD/JD</option><option>Master's</option><option>Bachelor's</option><option>Associate's</option></select></label>
- <label>Country / place<input id="ctry" placeholder="e.g. USA, France" style="width:120px"></label>
+ <label>Work mode<select id="mode"><option value="">Any</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="onsite">On site</option><option value="none">Not stated</option></select></label>
+ <label>I live in<input id="ctry" placeholder="e.g. Canada" style="width:110px" title="Keeps jobs open to people there: the place is in the allowed list, or the job says anywhere. Tick the box to also keep jobs whose rule is not stated."></label>
+ <label class="ck"><input type="checkbox" id="unclear" checked>+ rule not stated</label>
+ <label>Location rule<select id="rule"><option value="">Any</option><option value="only listed places">Must be in listed places</option><option value="anywhere">Anywhere</option><option value="must come on site">Must come on site</option><option value="listed place, rule not stated">Place listed, rule not stated</option><option value="none">Not stated</option></select></label>
  <label class="ck"><input type="checkbox" id="group" checked>Merge copies</label>
  <label class="ck"><input type="checkbox" id="closed">Show closed</label>
  <span id="count" class="mut small" style="padding-bottom:6px"></span>
@@ -52,7 +56,7 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
 <table><thead><tr>
  <th data-k="title">Job</th><th data-k="site">Site</th><th data-k="hourly">Pay</th><th data-k="contract_type">Kind</th>
  <th data-k="min_years_experience">Years of experience</th><th data-k="degrees">Degrees</th>
- <th data-k="commitment">Commitment</th><th data-k="countries">Where</th><th data-k="first_seen">First seen</th>
+ <th data-k="commitment">Commitment</th><th data-k="location_rule">Where / who can apply</th><th data-k="first_seen">First seen</th>
 </tr></thead><tbody id="tb"></tbody></table>
 <button id="more" hidden>Show more</button>
 </div>
@@ -64,7 +68,7 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
 <script>
 const DATA = /*DATA*/null;
 const $ = id => document.getElementById(id);
-const CT = {contractor: "contractor", temporary: "temporary", permanent: "permanent", internship: "internship"};
+const CT = {contractor: "contractor", "contractor?": "contract (assumed)", temporary: "temporary", permanent: "permanent", internship: "internship"};
 const PER = {hour: 1, year: 1 / 2080, month: 1 / 173, week: 1 / 40, day: 1 / 8};
 const rows = DATA.rows.map(r => ({...r, hourly: r.pay_max != null && PER[r.pay_unit] && (r.pay_currency || "USD") === "USD" ? r.pay_max * PER[r.pay_unit] : null}));
 let sortK = "first_seen", sortDir = -1, limit = 300;
@@ -72,7 +76,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const sym = c => ({USD: "$", EUR: "€", GBP: "£", CAD: "CA$", AUD: "A$", INR: "₹"}[c] || (c ? c + " " : "$"));
 const fmt = (n, c) => n == null ? "" : sym(c) + (n >= 10000 ? Math.round(n / 1000) + "k" : (Number.isInteger(n) ? n : n.toFixed(2)));
 function pay(j) {
-  if (j.pay_max == null) return `<span class="mut">not stated</span>`;
+  if (j.pay_max == null) return `<span class="mut">not stated</span>` + (j.pay_note ? `<div class="note" title="${esc(j.pay_text)}">${esc(j.pay_note)}</div>` : "");
   const u = j.pay_unit ? "/" + ({hour: "hr", year: "yr", month: "mo"}[j.pay_unit] || j.pay_unit) : "";
   let s = (j.pay_min != null && j.pay_min !== j.pay_max ? fmt(j.pay_min, j.pay_currency) + "–" : (j.pay_min == null ? "up to " : "")) + fmt(j.pay_max, j.pay_currency) + u;
   const assumed = (j.pay_currency_source || "").startsWith("assumed");
@@ -86,19 +90,47 @@ function pay(j) {
 // site list
 const sites = [...new Set(rows.map(r => r.site))].sort((a, b) => a.localeCompare(b));
 $("site").innerHTML += sites.map(s => `<option>${esc(s)}</option>`).join("");
+const lc = a => (a || []).join("; ").toLowerCase();
+function openTo(j, c, unclear) {
+  const excl = lc(j.excluded_places).includes(c);
+  if (excl) return false;
+  if (j.location_rule === "anywhere" || j.location_rule === "anywhere except excluded") return true;
+  if (j.location_rule === "only listed places") return lc(j.allowed_places).includes(c);
+  const listed = ((j.countries || "") + " " + (j.location || "")).toLowerCase();
+  if (j.location_rule === "must come on site") return listed.includes(c);
+  return unclear || listed.includes(c);
+}
 function filtered() {
   const q = $("q").value.trim().toLowerCase(), kind = $("kind").value, site = $("site").value, unit = $("unit").value,
     minpay = parseFloat($("minpay").value), maxyrs = parseFloat($("maxyrs").value), deg = $("deg").value,
-    ctry = $("ctry").value.trim().toLowerCase(), closed = $("closed").checked, cur = $("cur").value, ctype = $("ctype").value;
+    ctry = $("ctry").value.trim().toLowerCase(), closed = $("closed").checked, cur = $("cur").value, ctype = $("ctype").value,
+    mode = $("mode").value, rule = $("rule").value, unclear = $("unclear").checked;
   return rows.filter(j => (closed || j.active) && (!kind || j.kind === kind) && (!site || j.site === site) &&
     (!unit || (unit === "none" ? j.pay_max == null : j.pay_unit === unit)) &&
     (!cur || (cur === "other" ? j.pay_currency && !["USD", "CAD", "EUR", "GBP"].includes(j.pay_currency) : j.pay_currency === cur)) &&
-    (!ctype || (ctype === "none" ? !j.contract_type : j.contract_type === ctype)) &&
+    (!ctype || (ctype === "none" ? !j.contract_type : (ctype === "contractor" ? j.contract_type.startsWith("contractor") : j.contract_type === ctype))) &&
     (isNaN(minpay) || (j.hourly ?? -1) >= minpay) &&
     (isNaN(maxyrs) || j.min_years_experience == null || j.min_years_experience <= maxyrs) &&
     (!deg || (j.degrees || "").includes(deg)) &&
-    (!ctry || ((j.countries || "") + " " + (j.location || "")).toLowerCase().includes(ctry)) &&
+    (!mode || (mode === "none" ? !j.work_mode : j.work_mode === mode)) &&
+    (!rule || (rule === "none" ? !j.location_rule : j.location_rule === rule)) &&
+    (!ctry || openTo(j, ctry, unclear)) &&
     (!q || (j.title + " " + j.company + " " + j.location + " " + j.department + " " + j.snippet).toLowerCase().includes(q)));
+}
+const MODE = {remote: "Remote", hybrid: "Hybrid", onsite: "On site"};
+function whereCell(j, where) {
+  const m = j.work_mode ? `<span class="chip wm-${j.work_mode}" title="${esc(j.work_mode_evidence)}">${MODE[j.work_mode]}</span>` : "";
+  const ev = esc(j.location_evidence || "");
+  const al = (j.allowed_places || []).join(", "), ex = (j.excluded_places || []).join(", ");
+  let r = "";
+  if (j.location_rule === "only listed places") r = `<b title="${ev}">Only: ${esc(al.slice(0, 120))}${al.length > 120 ? "…" : ""}</b>`;
+  else if (j.location_rule === "anywhere") r = `<span title="${ev}">Anywhere</span>`;
+  else if (j.location_rule === "anywhere except excluded") r = `<span title="${ev}">Anywhere</span>`;
+  else if (j.location_rule === "must come on site") r = `<span title="${ev}">On site${where ? ": " + esc(where.slice(0, 90)) : ""}</span>`;
+  else if (j.location_rule === "listed place, rule not stated") r = `<span class="mut" title="${ev}">Listed: ${esc(where.slice(0, 90))} <i>(not said if required)</i></span>`;
+  else r = `<span class="mut">Location rule not stated</span>`;
+  if (ex) r += `<div class="note" title="${ev}">Not: ${esc(ex.slice(0, 100))}</div>`;
+  return m + " " + r;
 }
 function render() {
   let list = filtered();
@@ -124,11 +156,11 @@ function render() {
      <details data-src="${esc(j.source)}" data-uid="${esc(j.uid)}"><summary>full listing</summary><pre>loading…</pre></details></td>
    <td class="k-${j.kind}">${esc(j.site)}</td>
    <td class="num">${pay(j)}</td>
-   <td class="small" title="${esc(j.contract_evidence)}">${j.contract_type ? `<span class="chip ct-${j.contract_type}">${esc(CT[j.contract_type] || j.contract_type)}</span>` : `<span class="mut">not stated</span>`}</td>
+   <td class="small" title="${esc(j.contract_evidence)}">${j.contract_type ? `<span class="chip ct-${j.contract_type.replace("?", "")}${j.contract_type.endsWith("?") ? " assumed" : ""}">${esc(CT[j.contract_type] || j.contract_type)}</span>` : `<span class="mut">not stated</span>`}</td>
    <td>${j.min_years_experience != null ? `<b>${j.min_years_experience}+</b>` : `<span class="mut">not stated</span>`}<div class="exp">${esc(j.experience_text)}</div></td>
    <td>${(j.degrees || "").split(", ").filter(Boolean).map(d => `<span class="chip">${esc(d)}</span>`).join("")}</td>
    <td class="small">${esc([j.commitment, j.employment_type].filter(Boolean).join(" · "))}<div class="mut">${esc(j.arrangement)}</div></td>
-   <td class="small">${esc(where.slice(0, 160))}${where.length > 160 ? "…" : ""}${copies}</td>
+   <td class="small">${whereCell(j, where)}${copies}</td>
    <td class="num mut small">${esc(j.first_seen)}${j.posted ? `<div>posted ${esc(String(j.posted).slice(0, 10))}</div>` : ""}</td></tr>`;
   }).join("");
   $("more").hidden = list.length <= limit;
@@ -149,7 +181,11 @@ async function fullText(src, uid) {
     o.pay_site ? "Site's own pay field: " + amt([o.pay_site.min, o.pay_site.max, o.pay_site.currency || "", o.pay_site.unit]) : "",
     o.pay_note ? "Check: " + o.pay_note : "",
     (o.pay_all || []).length ? "Amounts in the text:\n" + o.pay_all.map(a => "  • " + amt(a) + "   …" + a[4] + "…").join("\n") : "",
-    "KIND OF JOB: " + (o.contract_type || "not stated") + (o.contract_evidence ? "  (" + o.contract_evidence + ")" : ""),
+    "KIND OF JOB: " + (o.contract_type === "contractor?" ? "contract (assumed)" : (o.contract_type || "not stated")) + (o.contract_evidence ? "  (" + o.contract_evidence + ")" : ""),
+    "WORK MODE: " + (o.work_mode || "not stated") + (o.work_mode_evidence ? "  (" + o.work_mode_evidence + ")" : ""),
+    "WHO CAN APPLY: " + (o.location_rule || "not stated") + ((o.allowed_places || []).length ? " — only: " + o.allowed_places.join(", ") : "") +
+      ((o.excluded_places || []).length ? " — not: " + o.excluded_places.join(", ") : "") + (o.location_evidence ? "  (" + o.location_evidence + ")" : ""),
+    o.location || o.countries ? "Listed location: " + [o.countries, o.location].filter(Boolean).join("; ") : "",
   ].filter(Boolean).join("\n");
   return head + "\n\n──────── full listing ────────\n\n" + o.text;
 }
@@ -163,7 +199,7 @@ document.querySelectorAll("th[data-k]").forEach(th => th.onclick = () => {
   if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = ["title", "site", "commitment", "countries", "degrees"].includes(sortK) ? 1 : -1; }
   render();
 });
-["q", "kind", "site", "unit", "cur", "minpay", "maxyrs", "deg", "ctry", "ctype", "group", "closed"].forEach(id => $(id).addEventListener("input", () => { limit = 300; render(); }));
+["q", "kind", "site", "unit", "cur", "minpay", "maxyrs", "deg", "ctry", "unclear", "mode", "rule", "ctype", "group", "closed"].forEach(id => $(id).addEventListener("input", () => { limit = 300; render(); }));
 $("more").onclick = () => { limit += 500; render(); };
 // sources tab
 const S = Object.entries(DATA.sources).sort((a, b) => (b[1].kept || 0) - (a[1].kept || 0));

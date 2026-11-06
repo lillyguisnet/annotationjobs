@@ -203,22 +203,32 @@ def dataannotation(board):
     slugs = sorted(set(re.findall(r'href="/job-board/([a-z0-9-]+)"', home)))
 
     def one(slug):
-        url = f"https://www.dataannotation.tech/job-board/{slug}"
-        h = fetch(url)
+        h = fetch(f"https://www.dataannotation.tech/job-board/{slug}")
         save_raw(board["source"], slug + ".html", h)
-        lines = page_lines(h)
-        a = next((i for i, l in enumerate(lines) if l == "Apply now"), 0)
-        b = next((i for i, l in enumerate(lines) if l == "Similar roles"), len(lines))
-        body = "\n".join(lines[a + 1:b])
-        title = lines[a + 1] if a else slug
-        m = re.search(r"Hourly rate up to\s*\n?\$?([\d,]+)(\+?)", body)
-        return listing(
-            "DataAnnotation", board["source"], slug, title, url, body, company="DataAnnotation (Surge AI)",
-            pay_max=float(m.group(1).replace(",", "")) if m else None, pay_unit="hour" if m else None,
-            pay_text=("up to $" + m.group(1) + m.group(2) + "/hr") if m else "",
-            arrangement="remote", commitment="Flexible hours", employment_type="Independent contractor",
-        )
+        return dataannotation_page(board["source"], slug, h)
     return _pool(one, slugs)
+
+
+def dataannotation_page(source, slug, h):
+    """One role page -> record. Also used to re-read saved raw pages."""
+    url = f"https://www.dataannotation.tech/job-board/{slug}"
+    t = re.search(r"<h1[^>]*>(.*?)</h1>", h, re.S)
+    title = html_to_text(t.group(1)) if t else slug.replace("-", " ").title()
+    lines = page_lines(h)
+    a = next((i for i, l in enumerate(lines) if l.lstrip("# ").strip() == title), 0)
+    b = next((i for i, l in enumerate(lines) if l.startswith("## Similar roles")), len(lines))
+    body = [l for l in lines[a:b] if l != "Apply now"]
+    # the side panel glues label and value ("LocationRemote", "Hourly rate up to$125+ / hour")
+    body = [re.sub(r"^(Location|Commitment|Type|Payouts)(?=[A-Z])", r"\1: ", l) for l in body]
+    body = [re.sub(r"^Hourly rate up to\s*", "Hourly rate: up to ", l) for l in body]
+    text = "\n".join(body)
+    m = re.search(r"Hourly rate: up to\s*\$?([\d,]+)(\+?)", text)
+    return listing(
+        "DataAnnotation", source, slug, title, url, text, company="DataAnnotation (Surge AI)",
+        pay_max=float(m.group(1).replace(",", "")) if m else None, pay_unit="hour" if m else None,
+        pay_text=("up to $" + m.group(1) + m.group(2) + "/hr") if m else "",
+        arrangement="remote", commitment="Flexible hours", employment_type="Independent contractor",
+    )
 
 
 # --- OneForma (Centific) ---------------------------------------------------------------------------

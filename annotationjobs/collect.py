@@ -15,6 +15,7 @@ Raw responses (not in git): /mnt/bulk/lilly/annotationjobs/raw/<date>/<source>/
 
 import argparse
 import csv
+import gzip
 import json
 import sys
 import time
@@ -23,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .boards import BOARDS
-from .common import TODAY
+from .common import RAW_ROOT, TODAY
 from .fields import derive, lever_salaries, site_pay_from_record
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,7 +32,8 @@ DATA = ROOT / "data"
 LISTINGS = DATA / "listings"
 DROPPED = DATA / "dropped"
 SUMMARY = ["uid", "site", "company", "kind", "title", "url", "pay_min", "pay_max", "pay_currency", "pay_unit",
-           "pay_text", "pay_source", "pay_currency_source", "pay_note", "contract_type", "contract_evidence", "hours_per_week", "commitment", "employment_type", "arrangement", "location", "countries",
+           "pay_text", "pay_source", "pay_currency_source", "pay_note", "contract_type", "contract_evidence",
+           "work_mode", "work_mode_evidence", "location_rule", "allowed_places", "excluded_places", "location_evidence", "hours_per_week", "commitment", "employment_type", "arrangement", "location", "countries",
            "degrees", "min_years_experience", "experience_text", "department", "posted", "first_seen",
            "last_seen", "active", "group", "relevant_why"]
 
@@ -104,6 +106,24 @@ def collect(only=None):
     (DATA / "sources.json").write_text(json.dumps(sources, indent=1, sort_keys=True))
 
 
+def _reread_dataannotation(src, rows):
+    from .marketplaces import dataannotation_page
+    n = 0
+    for uid, r in list(rows.items()):
+        raws = sorted(RAW_ROOT.glob(f"*/{src}/{r['id']}.html.gz"))
+        if not raws:
+            continue
+        with gzip.open(raws[-1]) as f:
+            new = dataannotation_page(src, r["id"], f.read().decode("utf-8", "replace"))
+        new["kind"] = r.get("kind")
+        rows[uid] = new
+        n += 1
+    return n
+
+
+RAW_PAGES = {"dataannotation": _reread_dataannotation}
+
+
 def reparse(only=None):
     """Re-derive pay, currency, engagement type, years and degrees from what is stored. No network."""
     boards = {b["source"]: b for b in BOARDS}
@@ -114,6 +134,9 @@ def reparse(only=None):
         b = boards.get(src, {"source": src, "kind": ""})
         rows = load_jsonl(p)
         lever = lever_salaries(src) if src.startswith("lever-") else None
+        if src in RAW_PAGES:  # parsing of these pages improved: rebuild the records from the saved raw pages
+            rebuilt = RAW_PAGES[src](src, rows)
+            print(f"   {src:24} rebuilt {rebuilt} records from raw pages")
         for r in rows.values():
             if "pay_site" not in r:  # stored before the site's own pay was kept apart
                 r["pay_site"] = site_pay_from_record(r, lever)

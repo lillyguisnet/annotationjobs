@@ -89,6 +89,7 @@ def pay_mentions(text):
         if b and RANGE_SEP.match(text[a["e"]:b["s"]]) and (a["unit"] in (None, b["unit"])):
             lo, hi, unit, s, e, cur = a["v"], b["v"], b["unit"] or a["unit"], a["s"], b["e"], b["cur"] if b["explicit"] else a["cur"]
             i += 2
+            explicit = a["explicit"] or b["explicit"]
         else:
             # bare second number of a range: "$40-75/hr", "€30 – 45 per hour"
             m = re.match(rf"\s*(?:-|–|—|to|and)\s*(?P<n>{NUM})\s?(?P<k>[kK]\b)?(?:\s?(?P<post>{_post})(?![A-Za-z]))?", text[a["e"]:])
@@ -98,9 +99,11 @@ def pay_mentions(text):
                 unit, e = _unit_after(text, e) if _unit_after(text, e)[0] else (None, e)
                 cur = POST.get((m.group("post") or "").upper()) or a["cur"]
                 s = a["s"]
+                explicit = a["explicit"] or bool(m.group("post"))
             else:
                 lo = hi = a["v"]
                 unit, s, e, cur = a["unit"], a["s"], a["e"], a["cur"]
+                explicit = a["explicit"]
                 before = text[max(0, s - 25):s]
                 if UPTO.search(before):
                     lo = None
@@ -122,7 +125,7 @@ def pay_mentions(text):
         not_pay = bool(re.match(r"[ \t]*(?:\([A-Z]{3}\)[ \t]*)?(?:[\w-]+[ \t]){0,2}?(?:" + NOT_PAY.pattern + ")", after, re.I)
                        or re.search(r"(?:" + NOT_PAY.pattern + r")[^\w.;!?\n]{0,3}(?:\w+[^\w.;!?\n]{1,3}){0,2}(?:of|up to|worth)?\s*$", before, re.I))
         out.append({"min": lo, "max": hi, "currency": cur, "unit": unit or "", "quote": quote,
-                    "near_pay_word": bool(NEAR.search(window)), "pos": s,
+                    "near_pay_word": bool(NEAR.search(window)), "pos": s, "explicit_currency": explicit,
                     "not_pay": not_pay})
     return out
 
@@ -152,16 +155,23 @@ def best_pay(mentions):
 # --- kind of engagement -------------------------------------------------------------------
 
 CONTRACTOR = re.compile(r"independent contractor|\bcontractors?\b|freelance|freelancer|\b1099\b|contract (role|position|basis|"
-                        r"work|rate|opportunity|engagement|job|assignment)|\bcontract\b(?!\s*(manager|management|negotiat|law|review))|"
+                        r"work|rate|opportunity|engagement|job|assignment)|(?<!employment )(?<!permanent )(?<!indefinite )(?<!open-ended )"
+                        r"\bcontract\b(?!\s*(manager|management|negotiat|law|review|drafting|lifecycle|analy))|"
                         r"gig\b|pay-by-task|per task|task-based|project-based|self-employed|"
                         r"not an employee|no employment relationship|auftragnehmer|autónomo|prestataire|indépendant",
                         re.I)
 TEMPORARY = re.compile(r"\btemporary\b|\btemp\b|fixed[- ]term|seasonal|\d+[- ]?(month|week)s? (contract|assignment|project|engagement)|"
                        r"contract (length|duration|of \d+)|duration: ?\d|\bw-?2\b|limited[- ]term|short[- ]term|befristet|"
                        r"\bcdd\b|interim\b", re.I)
-PERMANENT = re.compile(r"permanent|full[- ]time employee|regular (full[- ]time|employee|position)|"
-                       r"\bunbefristet|\bcdi\b|employee benefits|401\(?k\)?|equity|stock options|rsus?\b|"
-                       r"health, dental|medical, dental|paid time off|parental leave", re.I)
+# Said outright, or employee benefits that contractors do not get.
+PERMANENT = re.compile(r"\bpermanent (?:role|position|contract|employee|employment|job|hire|full[- ]time)|\bpermanent\b(?! residen)|"
+                       r"full[- ]time employee|regular (?:full[- ]time )?(?:employee|employment|position)|"
+                       r"\bunbefristet|contrat (?:en )?CDI|\bCDI contract|contrato indefinido|"
+                       r"401\(?k\)?|health(?:,| and) dental|medical, dental|dental(?:,| and) vision|"
+                       r"(?:offer|provide|benefits?\W|including|eligible for)[^.\n]{0,40}(?:health|medical) (?:insurance|coverage|benefits)|"
+                       r"paid time off|\bPTO\b|parental leave|pension (?:plan|scheme|contribution)|retirement (?:plan|savings)|"
+                       r"stock options|\bRSUs?\b|equity (?:grant|package|compensation|award)|offers equity|employee benefits|"
+                       r"benefits package|comprehensive benefits", re.I)
 INTERN = re.compile(r"\bintern(ship)?\b|\bco-?op\b|working student|werkstudent|stagiaire|apprentice", re.I)
 
 STRUCTURED = {  # what the site's own "employment type" fields say
@@ -202,10 +212,38 @@ def engagement(title, text, structured="", kind="", site_default=""):
     for name in ("contractor", "temporary"):
         if name in hits:
             return name, "text: …" + hits[name][1] + "…"
-    if st == "employee" and kind in ("lab", "vendor", "bigtech"):
-        return "permanent", f"site field: {structured} (employee, no contract or end date mentioned)"
-    if "permanent" in hits and kind in ("lab", "vendor", "bigtech"):
+    if "permanent" in hits and not re.search(r"no (?:employee )?benefits|not (?:eligible|entitled) (?:for|to) (?:employee )?benefits",
+                                             body, re.I):
         return "permanent", "text: …" + hits["permanent"][1] + "…"
     if site_default:
         return site_default, "platform: all its work is " + site_default + " work"
+    return "contractor?", ("assumed: nothing in the listing says it is permanent" +
+                           (f" (site field: {structured})" if structured else ""))
+
+
+# --- pay without a figure ------------------------------------------------------------------
+
+UNSTATED = [
+    ("paid per task, amount not stated",
+     r"paid (?:per|by the|for each) (?:approved |completed |accepted )?(?:task|unit|item|submission|asset|recording|clip|image|video)|per[- ]task (?:pay|basis|rate|compensation)|"
+     r"task[- ]based (?:pay|compensation|rate|payment)|pay[- ]by[- ]task|pay[- ]per[- ]task|output[- ]based|piece[- ]?rate|"
+     r"(?:earnings|compensation|pay(?:ment)?) per (?:approved |completed )?task|fixed rate for each task|paid for each (?:approved |completed )?task"),
+    ("rate varies (by country, level or project), not stated",
+     r"(?:pay|rates?|compensation|earnings?|paid|remuneration)[^.\n]{0,60}(?:vary|varies|depend(?:s|ing)? on|based on (?:your )?"
+     r"(?:location|country|level|tier|experience))|median at your tier|rates? (?:may )?vary"),
+    ("compensation shared later",
+     r"(?:compensation|pay|rate|details)[^.\n]{0,60}(?:shared|provided|discussed|communicated|disclosed|confirmed) (?:later|upon|during|after|at|when|once|in)|"
+     r"reach out with[^.\n]{0,60}compensation|information will be provided"),
+    ("described as competitive, no figure", r"competitive (?:pay|rates?|compensation|hourly|salary|remuneration)"),
+    ("paid hourly, amount not stated", r"paid (?:per|by the) hour|hourly (?:pay|rate|compensation|contract)|\(hourly\)"),
+]
+UNSTATED = [(n, re.compile(rx, re.I)) for n, rx in UNSTATED]
+
+
+def pay_unstated(text):
+    """When a listing gives no figure: what it says about pay instead, and the quote."""
+    for name, rx in UNSTATED:
+        m = rx.search(text or "")
+        if m:
+            return name, re.sub(r"\s+", " ", text[max(0, m.start() - 70):m.end() + 70]).strip()
     return "", ""
