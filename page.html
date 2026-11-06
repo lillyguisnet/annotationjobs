@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI training jobs: Mercor + Handshake AI</title>
+<style>
+:root{--bg:#fff;--fg:#1d1d1f;--mut:#6b6b70;--line:#e4e4e8;--acc:#2f6fed;--chip:#f1f3f7}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececf0;--mut:#9a9aa3;--line:#2c2c31;--acc:#7aa2ff;--chip:#222227}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:16px 20px 8px}h1{font-size:19px;margin:0 0 4px}.mut{color:var(--mut)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;padding:8px 20px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
+.bar label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:3px}
+input,select{font:inherit;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+#q{width:260px}table{border-collapse:collapse;width:100%}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{position:sticky;top:62px;background:var(--bg);cursor:pointer;user-select:none;font-size:12px;color:var(--mut);white-space:nowrap}
+th.on{color:var(--fg)}td.num{white-space:nowrap;font-variant-numeric:tabular-nums}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.chip{display:inline-block;background:var(--chip);border-radius:10px;padding:1px 7px;font-size:12px;margin:1px 2px 1px 0}
+.site-Mercor{color:#b5541b}.site-Handshake{color:#1b8a5a}
+details summary{cursor:pointer;color:var(--mut);font-size:12px}details pre{white-space:pre-wrap;font:12px/1.45 system-ui;max-height:340px;overflow:auto;background:var(--chip);padding:8px;border-radius:6px}
+.exp{font-size:12px;color:var(--mut);max-width:420px}
+</style></head><body>
+<header><h1>AI training &amp; annotation jobs</h1>
+<div class="mut" id="sub"></div></header>
+<div class="bar">
+ <label>Search (title or description)<input id="q" placeholder="e.g. biology, segmentation, French"></label>
+ <label>Site<select id="site"><option value="">Both</option><option>Mercor</option><option>Handshake AI</option></select></label>
+ <label>Paid per<select id="unit"><option value="">Any</option><option value="hour" selected>Hour</option><option value="task">Task</option><option value="one-time">One-time</option><option value="year">Year</option></select></label>
+ <label>Top pay at least<input id="minpay" type="number" min="0" step="5" style="width:90px" placeholder="$"></label>
+ <label>Years asked, at most<input id="maxyrs" type="number" min="0" style="width:90px" placeholder="any"></label>
+ <label>Degree mentioned<select id="deg"><option value="">Any</option><option>PhD</option><option>Master's</option><option>Bachelor's</option><option>Associate's</option></select></label>
+ <label>Country<input id="ctry" placeholder="e.g. USA, France" style="width:120px"></label>
+ <label>&nbsp;<span id="count" class="mut"></span></label>
+</div>
+<table><thead><tr>
+ <th data-k="title">Job</th><th data-k="site">Site</th><th data-k="pay_max">Pay</th>
+ <th data-k="min_years_experience">Years of experience</th><th data-k="degrees_mentioned">Degrees</th>
+ <th data-k="commitment">Commitment</th><th data-k="eligible_countries">Where</th><th data-k="posted">Posted</th>
+</tr></thead><tbody id="tb"></tbody></table>
+<script>
+const JOBS = /*DATA*/[];
+const $ = id => document.getElementById(id);
+let sortK = "pay_max", sortDir = -1;
+const money = n => n == null ? "" : "$" + (Number.isInteger(n) ? n : n.toFixed(2)).toLocaleString();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function pay(j){
+  const u = j.pay_unit ? "/" + (j.pay_unit === "hour" ? "hr" : j.pay_unit) : "";
+  if (j.pay_min != null && j.pay_min !== j.pay_max) return money(j.pay_min) + "–" + money(j.pay_max) + u;
+  return (j.pay_min == null && j.site === "Handshake AI" ? "up to " : "") + money(j.pay_max) + u;
+}
+function render(){
+  const q = $("q").value.trim().toLowerCase(), site = $("site").value, unit = $("unit").value,
+        minpay = parseFloat($("minpay").value), maxyrs = parseFloat($("maxyrs").value),
+        deg = $("deg").value, ctry = $("ctry").value.trim().toLowerCase();
+  let rows = JOBS.filter(j =>
+    (!site || j.site === site) && (!unit || j.pay_unit === unit) &&
+    (isNaN(minpay) || (j.pay_max ?? 0) >= minpay) &&
+    (isNaN(maxyrs) || j.min_years_experience == null || j.min_years_experience <= maxyrs) &&
+    (!deg || (j.degrees_mentioned || "").includes(deg)) &&
+    (!ctry || (j.eligible_countries + " " + j.location).toLowerCase().includes(ctry)) &&
+    (!q || (j.title + " " + j.description).toLowerCase().includes(q)));
+  rows.sort((a, b) => {
+    let x = a[sortK], y = b[sortK];
+    if (x == null || x === "") return 1; if (y == null || y === "") return -1;
+    return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * sortDir;
+  });
+  $("count").textContent = rows.length + " of " + JOBS.length + " listings";
+  document.querySelectorAll("th").forEach(th => th.classList.toggle("on", th.dataset.k === sortK));
+  $("tb").innerHTML = rows.map(j => `<tr>
+   <td><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.title)}</a>
+     <details><summary>details</summary><pre>${esc(j.description)}</pre></details></td>
+   <td class="site-${j.site.split(" ")[0]}">${esc(j.site)}</td>
+   <td class="num">${pay(j)}${j.hours_per_week ? `<div class="mut">${j.hours_per_week} h/week</div>` : ""}</td>
+   <td>${j.min_years_experience != null ? `<b>${j.min_years_experience}+</b> ` : `<span class="mut">not stated</span>`}<div class="exp">${esc(j.experience_text)}</div></td>
+   <td>${(j.degrees_mentioned || "").split(", ").filter(Boolean).map(d => `<span class="chip">${esc(d)}</span>`).join("")}</td>
+   <td>${esc(j.commitment)}<div class="mut">${esc(j.arrangement)}</div></td>
+   <td>${esc(j.eligible_countries)}<div class="mut">${esc(j.location)}</div></td>
+   <td class="num mut">${esc(j.posted)}</td></tr>`).join("");
+}
+document.querySelectorAll("th").forEach(th => th.onclick = () => {
+  if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = th.dataset.k === "title" ? 1 : -1; }
+  render();
+});
+["q","site","unit","minpay","maxyrs","deg","ctry"].forEach(id => $(id).addEventListener("input", render));
+const sites = {}; JOBS.forEach(j => sites[j.site] = (sites[j.site] || 0) + 1);
+$("sub").textContent = Object.entries(sites).map(([s, n]) => `${s}: ${n}`).join(" · ") +
+  ` · collected ${JOBS[0]?.collected || ""} from the public listings. Years and degrees are read from the text; check the listing before applying.`;
+render();
+</script></body></html>
