@@ -226,6 +226,7 @@ FIELDS = [
     "relevant", "relevant_why", "group", "text", "extra", "pay_site", "pay_source", "pay_currency_source",
     "pay_note", "pay_all", "contract_type", "contract_evidence", "degrees_from_site",
     "work_mode", "work_mode_evidence", "location_rule", "allowed_places", "excluded_places", "location_evidence",
+    "pay_variable", "pay_variable_why", "pay_earnings_claim",
 ]
 
 

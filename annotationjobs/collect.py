@@ -33,6 +33,7 @@ LISTINGS = DATA / "listings"
 DROPPED = DATA / "dropped"
 SUMMARY = ["uid", "site", "company", "kind", "title", "url", "pay_min", "pay_max", "pay_currency", "pay_unit",
            "pay_text", "pay_source", "pay_currency_source", "pay_note", "contract_type", "contract_evidence",
+           "pay_variable", "pay_variable_why", "pay_earnings_claim",
            "work_mode", "work_mode_evidence", "location_rule", "allowed_places", "excluded_places", "location_evidence", "hours_per_week", "commitment", "employment_type", "arrangement", "location", "countries",
            "degrees", "min_years_experience", "experience_text", "department", "posted", "first_seen",
            "last_seen", "active", "group", "relevant_why"]

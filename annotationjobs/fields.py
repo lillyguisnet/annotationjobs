@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .common import RAW_ROOT, degrees_in, experience
 from .places import location_info
-from .terms import best_pay, engagement, pay_mentions, pay_unstated
+from .terms import best_pay, earnings_claim, engagement, pay_mentions, pay_unstated, pay_varies
 
 # What each platform says about all its work, used only when a listing itself says nothing.
 SITE_DEFAULT = {
@@ -139,6 +139,19 @@ def derive(r, board):
     r["contract_type"], r["contract_evidence"] = engagement(
         r["title"], text + ("\n" + comp if comp else ""), structured, board.get("kind", ""), SITE_DEFAULT.get(r["source"], ""))
     r.update(location_info(r))
+    confirm_currency_by_location(r)
+    # variable pay: "up to $125/hr depending on task difficulty", "rates vary by country"
+    pos = [m["pos"] for m in mentions if r["pay_max"] is not None and abs(m["max"] - r["pay_max"]) < 0.01]
+    badge = (r.get("pay_text") or "")[:30].lower()
+    if badge:
+        pos.append(text.lower().find(badge))
+    why = pay_varies(text, pos) if r["pay_max"] is not None else ""
+    if r["pay_max"] is not None and (why or r["pay_min"] is None):
+        r["pay_variable"] = True
+        r["pay_variable_why"] = why or "only a top figure is given (\"up to\")"
+    else:
+        r["pay_variable"], r["pay_variable_why"] = False, ""
+    r["pay_earnings_claim"] = earnings_claim(text)
     # years and degrees (degrees from a site badge, e.g. Handshake, are kept)
     r["min_years_experience"], r["experience_text"] = experience(text)
     if not r.get("degrees_from_site"):
@@ -150,3 +163,24 @@ def _fmt(m):
     sym = {"USD": "$", "EUR": "€", "GBP": "£", "CAD": "CA$", "AUD": "A$"}.get(m["currency"], (m["currency"] or "") + " ")
     a = f"{sym}{m['min']:g}–" if m["min"] is not None and m["min"] != m["max"] else ("up to " if m["min"] is None else "")
     return f"{a}{sym}{m['max']:g}" + (f"/{m['unit']}" if m["unit"] else "")
+
+
+DOLLAR_COUNTRIES = {"Canada": "CAD", "Australia": "AUD", "New Zealand": "NZD", "Singapore": "SGD", "Hong Kong": "HKD",
+                    "Mexico": "MXN", "Taiwan": "TWD"}
+US_PLACES = {"United States", "Puerto Rico"}
+
+
+def confirm_currency_by_location(r):
+    """A bare "$" on a job that must be done from the US is US dollars. Elsewhere, say what it could be."""
+    if r.get("pay_max") is None or not (r.get("pay_currency_source") or "").startswith("assumed"):
+        return
+    allowed = set(r.get("allowed_places") or [])
+    where = " ".join([r.get("location") or "", r.get("countries") or ""])
+    from .places import STATE, places_in
+    if allowed and allowed <= US_PLACES:
+        r["pay_currency"], r["pay_currency_source"] = "USD", "location: must be in the US, so $ is US dollars"
+    elif r.get("location_rule") == "must come on site" and (set(places_in(where)) <= US_PLACES and (places_in(where) or STATE.search(where))):
+        r["pay_currency"], r["pay_currency_source"] = "USD", "location: on site in the US, so $ is US dollars"
+    elif len(allowed) == 1 and next(iter(allowed)) in DOLLAR_COUNTRIES:
+        c = next(iter(allowed))
+        r["pay_currency_source"] += f"; the job is {c}-only, so $ may mean {DOLLAR_COUNTRIES[c]}"

@@ -247,3 +247,34 @@ def pay_unstated(text):
         if m:
             return name, re.sub(r"\s+", " ", text[max(0, m.start() - 70):m.end() + 70]).strip()
     return "", ""
+
+
+# --- pay that varies ------------------------------------------------------------------------
+
+VARY = [re.compile(x, re.I) for x in (  # strongest first
+    r"depend(?:s|ing)? (?:up)?on (?:[^.\n;]|\.(?=\d)){3,80}",
+    r"var(?:y|ies) (?:by|with|based on|depending on|according to|across|per)(?:[^.\n;]|\.(?=\d)){3,80}",
+    r"rates? (?:may )?vary(?:[^.\n;]|\.(?=\d)){0,80}",
+    r"based on (?:the |your )?(?:task|project|level|tier|experience|location|country)(?:[^.\n;]|\.(?=\d)){0,60}",
+    r"commensurate with (?:[^.\n;]|\.(?=\d)){3,60}", r"determined by (?:[^.\n;]|\.(?=\d)){3,60}",
+    r"according to (?:your )?(?:level|tier|experience)(?:[^.\n;]|\.(?=\d)){0,50}", r"median at your tier", r"per hour equivalent")]
+# "Many contributors add $100k–$200k a year": a claim about some contributors, not this role's pay
+EARN_CLAIM = re.compile(r"[^.\n]{0,80}(?:contributors|experts|members|people|users|freelancers|taskers)[^.\n]{0,40}"
+                        r"(?:earn|make|add|take home)[^.\n]{0,80}(?:a year|per year|annually|a month|per month)[^.\n]{0,40}", re.I)
+
+
+def pay_varies(text, positions):
+    """Why the pay is variable, from the sentences around the pay figures (or '')."""
+    text = text or ""
+    windows = [text[max(0, p - 80):p + 260] for p in positions if p is not None and p >= 0]
+    for rx in VARY:
+        for w in windows:
+            m = rx.search(w)
+            if m:
+                return re.sub(r"\s+", " ", m.group(0)).strip(" .,;")
+    return ""
+
+
+def earnings_claim(text):
+    m = EARN_CLAIM.search(text or "")
+    return re.sub(r"\s+", " ", m.group(0)).strip() if m else ""

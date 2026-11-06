@@ -47,6 +47,15 @@ All of this is redone from the stored text, without fetching, by `--reparse`
   field has no currency, the text is searched for one; if neither names it, a bare "$" is
   recorded as USD and marked "assumed" (shown as `USD?`). "$/hr equiv." converts only USD,
   yearly pay at 2,080 h and monthly at 173 h.
+- Currency from location: a bare "$" on a job that must be done from the US (or on site in the
+  US) is recorded as USD with the reason. For a job limited to another dollar country (Canada,
+  Australia, Mexico...) it stays "assumed" with a note that "$" may be the local dollar.
+- Variable pay (`pay_variable`, `pay_variable_why`): only a top figure ("up to"), or the text
+  around the figure says it depends on task, project, level, country... (quoted).
+- `pay_earnings_claim`: sentences such as "Many contributors add $100k–$200k a year". Kept as
+  a note only: on DataAnnotation it is the same sentence on every role, including roles paying
+  at most $40/hr (which would need 5,000 hours a year to reach $200k), so no per-role pay is
+  derived from it.
 - No figure: `pay_note` says what the listing says instead ("paid per task, amount not stated",
   "rate varies…", "compensation shared later", "competitive"), `pay_text` quotes it.
 - Kind of job (`contract_type`, `contract_evidence`): contractor (freelance, independent
