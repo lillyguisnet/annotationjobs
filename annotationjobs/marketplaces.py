@@ -70,7 +70,7 @@ def handshake(board):
         if start is None:
             return None
         save_raw(board["source"], url.rstrip("/").rsplit("/", 1)[-1] + ".html", h)
-        title = lines[start - 1]
+        title = lines[start - 1].lstrip("# ").strip()
         head = lines[start + 1:start + 25]
         pay_line = next((l for l in head if "$" in l), "")
         nums = [float(n.replace(",", "")) for n in re.findall(r"\$([\d,]+(?:\.\d+)?)", pay_line)]
@@ -86,7 +86,7 @@ def handshake(board):
             pay_unit="hour" if "/hr" in pay_line else "", pay_text=pay_line,
             commitment=", ".join(t for t in tags if t != "Remote"), arrangement="remote" if "Remote" in tags else "",
             countries="USA" + (" (OPT/CPT students eligible)" if opt else ""),
-            degrees=", ".join(degs), extra={"tags": head[:12]},
+            degrees=", ".join(degs), degrees_from_site=bool(degs), extra={"tags": head[:12]},
         )
     return _pool(one, sorted(set(urls)))
 

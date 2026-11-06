@@ -26,6 +26,10 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
 #more{margin:14px 20px;font:inherit;padding:6px 14px;border:1px solid var(--line);border-radius:6px;background:var(--chip);color:var(--fg);cursor:pointer}
 #src td,#src th{font-size:13px}#src th{position:static}
 .err{color:var(--warn);font-size:12px;max-width:420px;white-space:pre-wrap}
+.cur{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:0 3px}.cur.nonusd{color:var(--warn);border-color:var(--warn)}
+.note{font-size:11.5px;color:var(--warn);max-width:220px;white-space:normal}
+.ct-contractor{background:#e3f4ea}.ct-temporary{background:#fdf0dc}.ct-permanent{background:#e3ecfd}.ct-internship{background:#efe6fb}
+@media (prefers-color-scheme:dark){.ct-contractor{background:#1e3a2a}.ct-temporary{background:#3d3020}.ct-permanent{background:#1f2c45}.ct-internship{background:#30254a}}
 </style></head><body>
 <header><h1>AI training &amp; annotation jobs</h1><span class="mut" id="sub"></span>
 <nav><button id="tab-jobs" class="on">Jobs</button><button id="tab-src">Sources</button></nav></header>
@@ -35,7 +39,9 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
  <label>Type of site<select id="kind"><option value="">All</option><option value="marketplace">Contributor platforms</option><option value="vendor">Data companies' own boards</option><option value="lab">AI labs &amp; AI companies</option><option value="bigtech">Big tech</option></select></label>
  <label>Site<select id="site"><option value="">All</option></select></label>
  <label>Paid per<select id="unit"><option value="">Any</option><option value="hour">Hour</option><option value="task">Task</option><option value="year">Year</option><option value="month">Month</option><option value="none">Not stated</option></select></label>
- <label>Top pay ≥ ($/hr equiv.)<input id="minpay" type="number" min="0" step="5" style="width:95px"></label>
+ <label>Currency<select id="cur"><option value="">Any</option><option>USD</option><option>CAD</option><option>EUR</option><option>GBP</option><option value="other">Other</option></select></label>
+ <label>Top pay ≥ (US$/hr equiv.)<input id="minpay" type="number" min="0" step="5" style="width:95px"></label>
+ <label>Kind of job<select id="ctype"><option value="">Any</option><option value="contractor">Contractor / freelance</option><option value="temporary">Temporary / fixed-term</option><option value="permanent">Permanent employee</option><option value="internship">Internship</option><option value="none">Not stated</option></select></label>
  <label>Years asked ≤<input id="maxyrs" type="number" min="0" style="width:70px" placeholder="any"></label>
  <label>Degree mentioned<select id="deg"><option value="">Any</option><option>PhD</option><option>MD/JD</option><option>Master's</option><option>Bachelor's</option><option>Associate's</option></select></label>
  <label>Country / place<input id="ctry" placeholder="e.g. USA, France" style="width:120px"></label>
@@ -44,7 +50,7 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
  <span id="count" class="mut small" style="padding-bottom:6px"></span>
 </div>
 <table><thead><tr>
- <th data-k="title">Job</th><th data-k="site">Site</th><th data-k="hourly">Pay</th>
+ <th data-k="title">Job</th><th data-k="site">Site</th><th data-k="hourly">Pay</th><th data-k="contract_type">Kind</th>
  <th data-k="min_years_experience">Years of experience</th><th data-k="degrees">Degrees</th>
  <th data-k="commitment">Commitment</th><th data-k="countries">Where</th><th data-k="first_seen">First seen</th>
 </tr></thead><tbody id="tb"></tbody></table>
@@ -58,6 +64,7 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
 <script>
 const DATA = /*DATA*/null;
 const $ = id => document.getElementById(id);
+const CT = {contractor: "contractor", temporary: "temporary", permanent: "permanent", internship: "internship"};
 const PER = {hour: 1, year: 1 / 2080, month: 1 / 173, week: 1 / 40, day: 1 / 8};
 const rows = DATA.rows.map(r => ({...r, hourly: r.pay_max != null && PER[r.pay_unit] && (r.pay_currency || "USD") === "USD" ? r.pay_max * PER[r.pay_unit] : null}));
 let sortK = "first_seen", sortDir = -1, limit = 300;
@@ -65,10 +72,14 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const sym = c => ({USD: "$", EUR: "€", GBP: "£", CAD: "CA$", AUD: "A$", INR: "₹"}[c] || (c ? c + " " : "$"));
 const fmt = (n, c) => n == null ? "" : sym(c) + (n >= 10000 ? Math.round(n / 1000) + "k" : (Number.isInteger(n) ? n : n.toFixed(2)));
 function pay(j) {
-  if (j.pay_max == null) return j.pay_text ? `<span class="mut small">${esc(j.pay_text.slice(0, 80))}</span>` : `<span class="mut">not stated</span>`;
+  if (j.pay_max == null) return `<span class="mut">not stated</span>`;
   const u = j.pay_unit ? "/" + ({hour: "hr", year: "yr", month: "mo"}[j.pay_unit] || j.pay_unit) : "";
   let s = (j.pay_min != null && j.pay_min !== j.pay_max ? fmt(j.pay_min, j.pay_currency) + "–" : (j.pay_min == null ? "up to " : "")) + fmt(j.pay_max, j.pay_currency) + u;
+  const assumed = (j.pay_currency_source || "").startsWith("assumed");
+  s += ` <span class="cur${j.pay_currency !== "USD" ? " nonusd" : ""}" title="${esc("Currency: " + (j.pay_currency_source || ""))}">${esc(j.pay_currency || "")}${assumed ? "?" : ""}</span>`;
   if (j.pay_unit && j.pay_unit !== "hour" && j.hourly) s += `<div class="mut small">≈ $${Math.round(j.hourly)}/hr</div>`;
+  if (j.pay_source && j.pay_source !== "site field") s += `<div class="mut small">${esc(j.pay_source === "text" ? "read from the text" : j.pay_source)}</div>`;
+  if (j.pay_note) s += `<div class="note">${esc(j.pay_note)}</div>`;
   if (j.hours_per_week) s += `<div class="mut small">${j.hours_per_week} h/week</div>`;
   return s;
 }
@@ -78,9 +89,11 @@ $("site").innerHTML += sites.map(s => `<option>${esc(s)}</option>`).join("");
 function filtered() {
   const q = $("q").value.trim().toLowerCase(), kind = $("kind").value, site = $("site").value, unit = $("unit").value,
     minpay = parseFloat($("minpay").value), maxyrs = parseFloat($("maxyrs").value), deg = $("deg").value,
-    ctry = $("ctry").value.trim().toLowerCase(), closed = $("closed").checked;
+    ctry = $("ctry").value.trim().toLowerCase(), closed = $("closed").checked, cur = $("cur").value, ctype = $("ctype").value;
   return rows.filter(j => (closed || j.active) && (!kind || j.kind === kind) && (!site || j.site === site) &&
     (!unit || (unit === "none" ? j.pay_max == null : j.pay_unit === unit)) &&
+    (!cur || (cur === "other" ? j.pay_currency && !["USD", "CAD", "EUR", "GBP"].includes(j.pay_currency) : j.pay_currency === cur)) &&
+    (!ctype || (ctype === "none" ? !j.contract_type : j.contract_type === ctype)) &&
     (isNaN(minpay) || (j.hourly ?? -1) >= minpay) &&
     (isNaN(maxyrs) || j.min_years_experience == null || j.min_years_experience <= maxyrs) &&
     (!deg || (j.degrees || "").includes(deg)) &&
@@ -111,6 +124,7 @@ function render() {
      <details data-src="${esc(j.source)}" data-uid="${esc(j.uid)}"><summary>full listing</summary><pre>loading…</pre></details></td>
    <td class="k-${j.kind}">${esc(j.site)}</td>
    <td class="num">${pay(j)}</td>
+   <td class="small" title="${esc(j.contract_evidence)}">${j.contract_type ? `<span class="chip ct-${j.contract_type}">${esc(CT[j.contract_type] || j.contract_type)}</span>` : `<span class="mut">not stated</span>`}</td>
    <td>${j.min_years_experience != null ? `<b>${j.min_years_experience}+</b>` : `<span class="mut">not stated</span>`}<div class="exp">${esc(j.experience_text)}</div></td>
    <td>${(j.degrees || "").split(", ").filter(Boolean).map(d => `<span class="chip">${esc(d)}</span>`).join("")}</td>
    <td class="small">${esc([j.commitment, j.employment_type].filter(Boolean).join(" · "))}<div class="mut">${esc(j.arrangement)}</div></td>
@@ -124,8 +138,20 @@ function render() {
 const cache = {};
 async function fullText(src, uid) {
   if (!cache[src]) cache[src] = fetch(`listings/${src}.jsonl`).then(r => r.text()).then(t => {
-    const m = {}; for (const l of t.split("\n")) if (l) { const o = JSON.parse(l); m[o.uid] = o.text; } return m; });
-  return (await cache[src])[uid];
+    const m = {}; for (const l of t.split("\n")) if (l) { const o = JSON.parse(l); m[o.uid] = o; } return m; });
+  const o = (await cache[src])[uid];
+  if (!o) return "";
+  const sym = c => ({USD: "$", EUR: "€", GBP: "£", CAD: "CA$", AUD: "A$"}[c] || (c || "") + " ");
+  const amt = a => (a[0] != null && a[0] !== a[1] ? sym(a[2]) + a[0] + "–" : (a[0] == null ? "up to " : "")) + sym(a[2]) + a[1] + (a[3] ? "/" + a[3] : "") + " " + (a[2] || "");
+  const head = [
+    "PAY: " + (o.pay_max != null ? amt([o.pay_min, o.pay_max, o.pay_currency, o.pay_unit]) : "not stated") +
+      (o.pay_source ? "  (from: " + o.pay_source + "; currency: " + (o.pay_currency_source || "") + ")" : ""),
+    o.pay_site ? "Site's own pay field: " + amt([o.pay_site.min, o.pay_site.max, o.pay_site.currency || "", o.pay_site.unit]) : "",
+    o.pay_note ? "Check: " + o.pay_note : "",
+    (o.pay_all || []).length ? "Amounts in the text:\n" + o.pay_all.map(a => "  • " + amt(a) + "   …" + a[4] + "…").join("\n") : "",
+    "KIND OF JOB: " + (o.contract_type || "not stated") + (o.contract_evidence ? "  (" + o.contract_evidence + ")" : ""),
+  ].filter(Boolean).join("\n");
+  return head + "\n\n──────── full listing ────────\n\n" + o.text;
 }
 $("tb").addEventListener("toggle", async e => {
   const d = e.target; if (d.tagName !== "DETAILS" || !d.open || d.dataset.done) return;
@@ -137,7 +163,7 @@ document.querySelectorAll("th[data-k]").forEach(th => th.onclick = () => {
   if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = ["title", "site", "commitment", "countries", "degrees"].includes(sortK) ? 1 : -1; }
   render();
 });
-["q", "kind", "site", "unit", "minpay", "maxyrs", "deg", "ctry", "group", "closed"].forEach(id => $(id).addEventListener("input", () => { limit = 300; render(); }));
+["q", "kind", "site", "unit", "cur", "minpay", "maxyrs", "deg", "ctry", "ctype", "group", "closed"].forEach(id => $(id).addEventListener("input", () => { limit = 300; render(); }));
 $("more").onclick = () => { limit += 500; render(); };
 // sources tab
 const S = Object.entries(DATA.sources).sort((a, b) => (b[1].kept || 0) - (a[1].kept || 0));

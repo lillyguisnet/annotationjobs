@@ -108,7 +108,8 @@ def lever(board):
             pay_text=j.get("salaryDescriptionPlain") or "",
             posted=_ms(j.get("createdAt")), department=" / ".join(x for x in (cat.get("department"), cat.get("team")) if x),
             relevant=rel, relevant_why=why,
-            extra={"description_html": j.get("description"), "lists": j.get("lists"), "additional_html": j.get("additional")},
+            extra={"description_html": j.get("description"), "lists": j.get("lists"), "additional_html": j.get("additional"),
+                   "salaryRange": sr or None},
         ))
     return out
 

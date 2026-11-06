@@ -3,6 +3,7 @@
     python3 -m annotationjobs.collect                 # everything
     python3 -m annotationjobs.collect --only mercor,gh-xai
     python3 -m annotationjobs.collect --page-only     # rebuild page/CSV from the store
+    python3 -m annotationjobs.collect --reparse       # re-read pay/type/years from stored text, no fetching
 
 Store (in git):
   data/listings/<source>.jsonl   one listing per line, full text, kept after it closes
@@ -23,13 +24,14 @@ from pathlib import Path
 
 from .boards import BOARDS
 from .common import TODAY
+from .fields import derive, lever_salaries, site_pay_from_record
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 LISTINGS = DATA / "listings"
 DROPPED = DATA / "dropped"
 SUMMARY = ["uid", "site", "company", "kind", "title", "url", "pay_min", "pay_max", "pay_currency", "pay_unit",
-           "pay_text", "hours_per_week", "commitment", "employment_type", "arrangement", "location", "countries",
+           "pay_text", "pay_source", "pay_currency_source", "pay_note", "contract_type", "contract_evidence", "hours_per_week", "commitment", "employment_type", "arrangement", "location", "countries",
            "degrees", "min_years_experience", "experience_text", "department", "posted", "first_seen",
            "last_seen", "active", "group", "relevant_why"]
 
@@ -78,6 +80,8 @@ def collect(only=None):
                 info.update(last_error=err, last_error_date=TODAY)
                 print(f"!! {src:24} FAILED in {secs:5.0f}s  {err.splitlines()[0][:120]}")
                 continue
+            for r in rows:
+                derive(r, b)
             keep = merge_duplicates([r for r in rows if r["relevant"]])
             drop = [r for r in rows if not r["relevant"]]
             old = load_jsonl(LISTINGS / f"{src}.jsonl")
@@ -98,6 +102,35 @@ def collect(only=None):
             print(f"   {src:24} {len(rows):5} fetched  {len(keep):5} kept  {len(old):5} stored  {secs:5.0f}s")
     (DATA / "seen.json").write_text(json.dumps(seen, indent=0, sort_keys=True))
     (DATA / "sources.json").write_text(json.dumps(sources, indent=1, sort_keys=True))
+
+
+def reparse(only=None):
+    """Re-derive pay, currency, engagement type, years and degrees from what is stored. No network."""
+    boards = {b["source"]: b for b in BOARDS}
+    for p in sorted(LISTINGS.glob("*.jsonl")):
+        src = p.stem
+        if only and src not in only:
+            continue
+        b = boards.get(src, {"source": src, "kind": ""})
+        rows = load_jsonl(p)
+        lever = lever_salaries(src) if src.startswith("lever-") else None
+        for r in rows.values():
+            if "pay_site" not in r:  # stored before the site's own pay was kept apart
+                r["pay_site"] = site_pay_from_record(r, lever)
+                if src == "handshake":
+                    r["degrees_from_site"] = bool(r.get("degrees"))
+            if lever is not None and r["id"] in lever:
+                r["extra"]["salaryRange"] = lever[r["id"]]
+            r.setdefault("kind", b.get("kind", ""))
+            r["title"] = r["title"].lstrip("# ").strip()  # headings once leaked into a few titles
+            derive(r, b)
+        with open(p, "w") as f:
+            for uid in sorted(rows):
+                f.write(json.dumps(rows[uid], ensure_ascii=False, sort_keys=True) + "\n")
+        n = len(rows)
+        pay = sum(r["pay_max"] is not None for r in rows.values())
+        ct = sum(bool(r["contract_type"]) for r in rows.values())
+        print(f"   {src:24} {n:5} listings  pay {pay:5}  type {ct:5}")
 
 
 def all_listings():
@@ -135,13 +168,17 @@ def main():
     ap.add_argument("--only", help="comma-separated sources")
     ap.add_argument("--page-only", action="store_true")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--reparse", action="store_true")
     a = ap.parse_args()
     if a.list:
         for b in BOARDS:
             print(f"{b['source']:24} {b['kind']:12} {b['site']}")
         return
-    if not a.page_only:
-        collect(set(a.only.split(",")) if a.only else None)
+    only = set(a.only.split(",")) if a.only else None
+    if a.reparse:
+        reparse(only)
+    elif not a.page_only:
+        collect(only)
     write_outputs()
 
 

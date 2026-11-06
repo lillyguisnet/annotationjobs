@@ -217,61 +217,28 @@ def degrees_in(text):
     return [name for name, rx in DEGREES if re.search(rx, text or "", re.I)]
 
 
-CUR = {"$": "USD", "US$": "USD", "€": "EUR", "£": "GBP", "CA$": "CAD", "C$": "CAD", "A$": "AUD", "₹": "INR"}
-PAY = re.compile(
-    r"(?P<cur>US\$|CA\$|C\$|A\$|\$|€|£|₹)\s?(?P<a>\d[\d,]*(?:\.\d+)?)\s?(?P<ak>[kK])?"
-    r"(?:\s*(?:USD|CAD|EUR|GBP))?"
-    r"(?:\s*(?:-|–|—|to|and)\s*(?:US\$|CA\$|C\$|A\$|\$|€|£|₹)?\s?(?P<b>\d[\d,]*(?:\.\d+)?)\s?(?P<bk>[kK])?)?"
-    r"(?:\s*(?:USD|CAD|EUR|GBP))?"
-    r"\s*(?:/|per|an|a)?\s*(?:approved |completed |submitted |accepted )?(?P<unit>hour|hr|h\b|year|yr|annum|annually|month|mo\b|week|task|project)?",
-    re.I,
-)
-
-
-def pay_from_text(text):
-    """First explicit pay figure or range in the text: (min, max, currency, unit, quote)."""
-    for m in PAY.finditer(text or ""):
-        a = float(m.group("a").replace(",", "")) * (1000 if m.group("ak") else 1)
-        b = m.group("b")
-        b = float(b.replace(",", "")) * (1000 if (m.group("bk") or (m.group("ak") and not m.group("bk") and float(b.replace(",", "")) < 1000)) else 1) if b else None
-        unit = (m.group("unit") or "").lower()
-        unit = {"hr": "hour", "h": "hour", "yr": "year", "annum": "year", "annually": "year", "mo": "month"}.get(unit, unit)
-        hi = b or a
-        if not unit:
-            unit = "year" if hi >= 20000 else ("hour" if hi <= 500 and re.search(r"hour|/hr|hourly", text[m.start():m.end() + 40], re.I) else "")
-        if hi < 5 or (not unit and hi < 1000 and not b):
-            continue  # "$5 gift card", "$1M funding"...
-        quote = text[max(0, m.start() - 60):m.end() + 20].replace("\n", " ").strip()
-        return (a if b else None), hi, CUR.get(m.group("cur").upper(), "USD"), unit, quote
-    return None, None, "", "", ""
-
-
 # --- listing records -------------------------------------------------------------
 
 FIELDS = [
     "uid", "site", "company", "source", "id", "title", "url", "location", "countries", "arrangement",
     "commitment", "employment_type", "hours_per_week", "pay_min", "pay_max", "pay_currency", "pay_unit",
     "pay_text", "posted", "department", "degrees", "min_years_experience", "experience_text",
-    "relevant", "relevant_why", "group", "text", "extra",
+    "relevant", "relevant_why", "group", "text", "extra", "pay_site", "pay_source", "pay_currency_source",
+    "pay_note", "pay_all", "contract_type", "contract_evidence", "degrees_from_site",
 ]
 
 
 def listing(site, source, id, title, url, text, **kw):
-    """Build one record. Fills pay/years/degrees from the text when the source gave none."""
+    """Build one record. Pay given here is the site's own pay field (kept in pay_site);
+    fields.derive() later combines it with what the text says."""
     r = {k: None for k in FIELDS}
     r.update(site=site, source=source, id=str(id), title=(title or "").strip(), url=url, text=(text or "").strip())
     r.update(kw)
     r["uid"] = f"{source}:{id}"
     r["company"] = r["company"] or site
-    if r["pay_max"] is None:
-        lo, hi, cur, unit, quote = pay_from_text(r["text"])
-        if hi is not None:
-            r.update(pay_min=lo, pay_max=hi, pay_currency=cur, pay_unit=unit, pay_text=quote)
-    r["pay_currency"] = r["pay_currency"] or ("USD" if r["pay_max"] is not None else "")
-    if r["min_years_experience"] is None:
-        r["min_years_experience"], r["experience_text"] = experience(r["text"])
-    if not r["degrees"]:
-        r["degrees"] = ", ".join(degrees_in(r["text"]))
+    if r["pay_max"] is not None or r["pay_min"] is not None:
+        r["pay_site"] = {"min": r["pay_min"], "max": r["pay_max"] if r["pay_max"] is not None else r["pay_min"],
+                         "currency": r["pay_currency"] or None, "unit": r["pay_unit"] or ""}
     if r["relevant"] is None:
         r["relevant"], r["relevant_why"] = True, "contributor marketplace"
     r["group"] = r["group"] or r["uid"]
