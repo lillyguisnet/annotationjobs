@@ -1,6 +1,6 @@
 "use strict";
-// Hourly pay of AI-training / data-annotation jobs: one box plot (pay on the y axis, any grouping on the
-// x axis, dots colored by any grouping) above a table, both driven by the same filters.
+// Pay of AI-training / data-annotation jobs: one box plot (pay in US$ on the y axis, per hour or per task /
+// project, any grouping on the x axis, dots colored by any grouping) above a table, both driven by the same filters.
 // Data: data/jobs.json, built by `python3 -m annotationjobs.site`.
 
 (() => {
@@ -15,14 +15,24 @@
   const OTHER = "#b8bfca";
   const PALETTE = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#ff8ab7", "#a463f2", "#97bbf5", "#9c6b4e"];
   const RAMP = d3.interpolateRgbBasis(["#f2b134", "#e4572e", "#b8336a", "#5b2a86", "#16324f"]);
-  const NEUTRAL = new Set(["Not stated", "None mentioned", "Not in the chart", "Nothing about pay"]);
-  const FILTER_ORDER = ["field", "site", "kind", "degree", "years", "mode", "who", "contract", "pay", "usd"];
+  const NEUTRAL = new Set(["Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated"]);
+  const FILTER_ORDER = ["field", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "cur"];
+  // pay basis: one at a time, a per-hour and a per-task figure do not belong on the same axis
+  const BASES = {
+    hour: { label: "Per hour", unit: "/hr", axis: "Top of hourly rate (US$)", title: "Hourly pay", color: "pay",
+      sub: "Top of each job's hourly rate in US$ (salaries at 40 hours a week, other currencies converted)" },
+    piece: { label: "Per task or project", unit: "", axis: "Top of pay per task, project or session (US$)", title: "Pay per task or project",
+      color: "unit", sub: "Top of each job's pay per task, project or session in US$ (other currencies converted)" },
+    none: { label: "No pay figure", unit: "", axis: "", title: "Jobs with no pay figure", color: "pay", sub: "" },
+  };
+  const yv = (j) => (S.basis === "hour" ? j.h : S.basis === "piece" ? j.pt : null);
+  const basisOf = (j) => (j.h != null ? "hour" : j.pt != null ? "piece" : "none");
   const SHORT = { "United States": "US", "United Kingdom": "UK", "United Arab Emirates": "UAE" };
   const SYM = { USD: "$", EUR: "€", GBP: "£", CAD: "CA$", AUD: "A$", INR: "₹", PHP: "₱" };
   const UNIT = { hour: "/hr", year: "/year", month: "/month", project: " per project", task: " per task", session: " per session" };
-  const DEFAULTS = { x: "field", color: "pay", sort: "auto", scale: "log" };
+  const DEFAULTS = { basis: "hour", x: "field", color: "pay", sort: "auto", scale: "log" };
 
-  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES;
+  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE;
   let filtered = [];
   let tableRows = [];
   const S = {
@@ -42,6 +52,7 @@
     JOBS = data.jobs;
     SNAPSHOT = data.snapshot;
     POSTINGS = data.postings;
+    FXDATE = data.fx && data.fx.date;
     for (const j of JOBS) j.text = [j.t, j.co, j.s, ...j.loc, ...j.pl].join(" ").toLowerCase();
     const cc = new Map();
     for (const j of JOBS) if (j.w !== "except") for (const p of j.pl) cc.set(p, (cc.get(p) || 0) + 1);
@@ -54,11 +65,12 @@
     buildFilterButtons();
     bindControls();
     const sites = new Set(JOBS.map((j) => j.s)).size;
-    const nh = JOBS.filter((j) => j.h != null).length;
+    const nh = JOBS.filter((j) => j.h != null).length, np = JOBS.filter((j) => j.pt != null).length;
     $("#lede").innerHTML = `<b>${fmtInt(JOBS.length)}</b> open jobs (${fmtInt(POSTINGS)} postings once each city's copy is counted) ` +
       `from <b>${sites}</b> sites: contributor platforms, data companies' own boards, AI labs and big tech. ` +
-      `<b>${fmtInt(nh)}</b> of them give an hourly rate in US dollars. Collected ${niceDate(SNAPSHOT)}.`;
+      `<b>${fmtInt(nh)}</b> give an hourly rate or a salary, <b>${fmtInt(np)}</b> a rate per task or project. Collected ${niceDate(SNAPSHOT)}.`;
     $("#foot").innerHTML = `Data collected ${niceDate(SNAPSHOT)} from the sites' public job pages. ` +
+      (FXDATE ? `Other currencies converted to US$ at the European Central Bank rates of ${niceDate(FXDATE)}. ` : "") +
       `Code, method and full data: <a href="https://github.com/lillyguisnet/annotationjobs">github.com/lillyguisnet/annotationjobs</a>.`;
     let lastW = 0;
     new ResizeObserver(debounce(() => {
@@ -89,6 +101,7 @@
   }
 
   function passes(j, except) {
+    if (except !== "basis" && basisOf(j) !== S.basis) return false;
     for (const k in S.f) {
       if (k === except) continue;
       if (!S.f[k].has(j.c[DI[k]])) return false;
@@ -96,7 +109,8 @@
     if (S.q) for (const w of S.q.toLowerCase().split(/\s+/)) if (w && !j.text.includes(w)) return false;
     if (S.live && except !== "live" && !openTo(j, S.live)) return false;
     if (except !== "pay$" && (S.min != null || S.max != null)) {
-      if (j.h == null || (S.min != null && j.h < S.min) || (S.max != null && j.h > S.max)) return false;
+      const v = yv(j);
+      if (v == null || (S.min != null && v < S.min) || (S.max != null && v > S.max)) return false;
     }
     return true;
   }
@@ -116,6 +130,7 @@
     }
     if (["auto", "median", "count", "natural"].includes(p.get("sort"))) S.sort = p.get("sort");
     if (["log", "linear"].includes(p.get("scale"))) S.scale = p.get("scale");
+    S.basis = p.get("pay") in BASES ? p.get("pay") : DEFAULTS.basis;
     for (const d of DIMS) {
       const idx = (v) => v.split("|").map((x) => d.values.indexOf(x)).filter((i) => i >= 0);
       if (p.get("f." + d.key) != null) {
@@ -137,6 +152,7 @@
 
   function writeHash() {
     const p = new URLSearchParams();
+    if (S.basis !== DEFAULTS.basis) p.set("pay", S.basis);
     for (const k of ["x", "color", "sort", "scale"]) if (S[k] !== DEFAULTS[k]) p.set(k, S[k]);
     for (const k in S.f) {
       const vals = DIMS[DI[k]].values, on = S.f[k];
@@ -176,6 +192,14 @@
 
   function buildFilterButtons() {
     const box = $("#filters");
+    const seg = document.createElement("div");
+    seg.className = "seg basis";
+    seg.id = "basis";
+    seg.setAttribute("role", "group");
+    seg.setAttribute("aria-label", "Pay basis");
+    seg.innerHTML = Object.entries(BASES).map(([k, b]) => `<button type="button" data-v="${k}">${esc(b.label)} <span class="n"></span></button>`).join("");
+    seg.querySelectorAll("button").forEach((b) => b.onclick = () => setBasis(b.dataset.v));
+    box.insertBefore(seg, box.firstChild);
     const mk = (id, label) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "fbtn"; b.dataset.f = id; b.setAttribute("aria-expanded", "false");
@@ -184,19 +208,40 @@
       box.appendChild(b);
     };
     mk("live", "Open to people in");
-    mk("pay$", "Hourly pay");
+    mk("pay$", "Pay range");
     for (const k of FILTER_ORDER) mk(k, DIMS[DI[k]].label);
   }
 
   function refreshFilterButtons() {
     for (const b of document.querySelectorAll(".fbtn")) {
       const id = b.dataset.f;
-      let on = false, label = id === "live" ? "Open to people in" : id === "pay$" ? "Hourly pay" : DIMS[DI[id]].label, badge = "";
+      let on = false, label = id === "live" ? "Open to people in" : id === "pay$" ? "Pay range" : DIMS[DI[id]].label, badge = "";
       if (id === "live" && S.live) { on = true; label = "Open to people in " + S.live; }
-      else if (id === "pay$" && (S.min != null || S.max != null)) { on = true; label = "Hourly pay " + rangeText(); }
+      else if (id === "pay$" && (S.min != null || S.max != null)) { on = true; label = "Pay " + rangeText(); }
+      if (id === "pay$") b.hidden = S.basis === "none";
       else if (S.f[id]) { on = true; badge = S.f[id].size; }
       b.classList.toggle("on", on);
       b.innerHTML = `<span class="l">${esc(label)}</span>${badge ? `<span class="badge">${badge}</span>` : ""}<span class="caret"></span>`;
+    }
+  }
+
+  function setBasis(v) {
+    if (v === S.basis) return;
+    if (S.color === BASES[S.basis].color) S.color = BASES[v].color; // follow the suggested coloring unless it was changed
+    $("#color").value = S.color;
+    S.basis = v;
+    S.min = S.max = null; // a per-hour limit means nothing per task
+    S.limit = 100;
+    update();
+  }
+
+  function refreshBasis() {
+    const n = { hour: 0, piece: 0, none: 0 };
+    for (const j of JOBS) if (passes(j, "basis")) n[basisOf(j)]++;
+    for (const b of document.querySelectorAll("#basis button")) {
+      b.classList.toggle("on", b.dataset.v === S.basis);
+      b.setAttribute("aria-pressed", b.dataset.v === S.basis);
+      b.querySelector(".n").textContent = fmtInt(n[b.dataset.v]);
     }
   }
 
@@ -296,10 +341,11 @@
 
   function fillPay(pop) {
     if (pop.querySelector("#pmin")) return; // keep focus while typing
-    pop.innerHTML = `<div class="pop-head"><b>Hourly pay</b><p>Top of the hourly range, in US$. A limit here hides jobs with no hourly US$ rate.</p></div>
+    const u = S.basis === "hour" ? "$/hr" : "$ per piece";
+    pop.innerHTML = `<div class="pop-head"><b>Pay range</b><p>${S.basis === "hour" ? "Top of the hourly rate" : "Top of the pay per task, project or session"}, in US$.</p></div>
       <div class="pop-body"><div class="row2">
-        <label>At least ($/hr)<input type="number" id="pmin" min="0" step="1" inputmode="decimal" value="${S.min ?? ""}" placeholder="any"></label>
-        <label>At most ($/hr)<input type="number" id="pmax" min="0" step="1" inputmode="decimal" value="${S.max ?? ""}" placeholder="any"></label>
+        <label>At least (${u})<input type="number" id="pmin" min="0" step="1" inputmode="decimal" value="${S.min ?? ""}" placeholder="any"></label>
+        <label>At most (${u})<input type="number" id="pmax" min="0" step="1" inputmode="decimal" value="${S.max ?? ""}" placeholder="any"></label>
       </div></div>
       <div class="pop-foot"><button type="button" class="linkbtn" data-clear>Clear</button></div>`;
     const read = debounce(() => {
@@ -322,7 +368,7 @@
     const chips = [];
     if (S.q) chips.push(["Search", `“${S.q}”`, () => { S.q = ""; $("#q").value = ""; }]);
     if (S.live) chips.push(["Open to people in", S.live + (S.unclear ? " (plus jobs that don't say)" : ""), () => { S.live = ""; }]);
-    if (S.min != null || S.max != null) chips.push(["Hourly pay", rangeText(), () => { S.min = S.max = null; }]);
+    if (S.min != null || S.max != null) chips.push(["Pay", rangeText() + BASES[S.basis].unit, () => { S.min = S.max = null; }]);
     for (const k of FILTER_ORDER) {
       if (!S.f[k]) continue;
       const d = DIMS[DI[k]];
@@ -346,6 +392,7 @@
   function update() {
     filtered = JOBS.filter((j) => passes(j));
     for (const b of document.querySelectorAll("#scale button")) b.classList.toggle("on", b.dataset.v === S.scale);
+    refreshBasis();
     refreshFilterButtons();
     renderChips();
     renderChart();
@@ -387,16 +434,17 @@
     svg.selectAll("*").remove();
     hideTip();
     const xi = DI[S.x], xd = DIMS[xi];
-    const pts = filtered.filter((j) => j.h != null);
-    const col = colors(S.color ? JOBS.filter((j) => j.h != null && passes(j, S.color)) : pts);
+    const B = BASES[S.basis];
+    const pts = filtered.filter((j) => yv(j) != null);
+    const col = colors(S.color ? JOBS.filter((j) => yv(j) != null && passes(j, S.color)) : pts);
 
-    const nOff = filtered.length - pts.length;
-    const med = d3.median(pts, (j) => j.h);
-    $("#chart-title").textContent = `Hourly pay by ${xd.label.toLowerCase()}`;
-    $("#chart-sub").innerHTML = pts.length
-      ? `Top of each job's hourly rate, US$. <b>${fmtInt(pts.length)}</b> jobs with an hourly US$ rate match your filters ` +
-        `(median <b>${money(med)}/hr</b>)` + (nOff ? `; ${fmtInt(nOff)} more are paid another way and are only in the table.` : ".")
-      : `No job with an hourly US$ rate matches these filters` + (nOff ? `; ${fmtInt(nOff)} paid another way are in the table.` : ".");
+    const med = d3.median(pts, yv);
+    $("#chart-title").textContent = S.basis === "none" ? B.title : `${B.title} by ${xd.label.toLowerCase()}`;
+    $("#chart-sub").innerHTML = S.basis === "none"
+      ? `<b>${fmtInt(filtered.length)}</b> jobs match your filters but give no pay figure that could be read. They are listed in the table, with what each listing says about pay.`
+      : pts.length
+        ? `${B.sub}. <b>${fmtInt(pts.length)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>).`
+        : `No job matches these filters.`;
     const cd = S.color ? DIMS[DI[S.color]] : null;
     $("#chart-note").innerHTML = `<b>${esc(xd.label)}:</b> ${esc(xd.help)}` + (cd && cd !== xd ? ` <b>${esc(cd.label)}:</b> ${esc(cd.help)}` : "");
     renderLegend(col);
@@ -411,7 +459,7 @@
     const logScale = S.scale === "log";
     const tf = logScale ? Math.log : (v) => v;
     const groups = [...by].map(([k, js]) => {
-      const v = js.map((j) => j.h).sort((a, b) => a - b);
+      const v = js.map(yv).sort((a, b) => a - b);
       const g = { k, label: xd.values[k], js, v, n: v.length,
         q1: d3.quantileSorted(v, 0.25), med: d3.quantileSorted(v, 0.5), q3: d3.quantileSorted(v, 0.75) };
       const iqr = tf(g.q3) - tf(g.q1);
@@ -434,8 +482,8 @@
     let width = Math.max(wrapW, M.l + M.r + n * minBand);
     let band = (width - M.l - M.r) / n;
     const rotate = band < 62;
-    if (rotate && groups.length) { // the first slanted label reaches left of its group: make room for it
-      const reach = Math.min(groups[0].label.length, maxChars) * 6.4 * Math.SQRT1_2 + 4 - band / 2;
+    if (rotate && groups.length) { // slanted labels reach left of their group: make room for the furthest one
+      const reach = d3.max(groups, (g, i) => Math.min(g.label.length + 4, maxChars + 4) * 6.4 * Math.SQRT1_2 + 4 - i * minBand);
       if (reach > M.l) {
         M.l = Math.ceil(reach);
         width = Math.max(wrapW, M.l + M.r + n * minBand);
@@ -450,21 +498,21 @@
     svg.attr("width", width).attr("height", height).attr("viewBox", `0 0 ${width} ${height}`);
 
     if (!pts.length) {
-      svg.attr("height", 160).attr("viewBox", `0 0 ${width} 160`);
-      svg.append("text").attr("class", "empty").attr("x", width / 2).attr("y", 80).attr("text-anchor", "middle")
-        .text("No job with an hourly US$ rate matches these filters.");
+      svg.attr("height", 120).attr("viewBox", `0 0 ${width} 120`);
+      svg.append("text").attr("class", "empty").attr("x", width / 2).attr("y", 60).attr("text-anchor", "middle")
+        .text(S.basis === "none" ? "Nothing to plot: these jobs give no pay figure. See the table below." : "No job matches these filters.");
       chartState = null;
       return;
     }
 
-    const [lo, hi] = d3.extent(pts, (j) => j.h);
+    const [lo, hi] = d3.extent(pts, yv);
     const y = logScale
-      ? d3.scaleLog().domain([Math.max(lo / 1.35, 0.5), hi * 1.35]).range([M.t + plotH, M.t])
+      ? d3.scaleLog().domain([Math.max(lo / 1.35, 0.01), hi * 1.35]).range([M.t + plotH, M.t])
       : d3.scaleLinear().domain([0, hi * 1.05]).nice().range([M.t + plotH, M.t]);
     let ticks;
     if (logScale) {
       const [a, b] = y.domain();
-      ticks = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].filter((t) => t >= a && t <= b);
+      ticks = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter((t) => t >= a && t <= b);
       if (ticks.length < 4) ticks = [1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000].filter((t) => t >= a && t <= b);
     } else ticks = y.ticks(8);
 
@@ -475,7 +523,7 @@
     gY.selectAll("text").data(ticks).join("text")
       .attr("x", M.l - 8).attr("y", (t) => y(t)).attr("dy", "0.32em").attr("text-anchor", "end").text((t) => money(t));
     svg.append("text").attr("class", "ylab").attr("transform", `translate(12,${M.t + plotH / 2}) rotate(-90)`)
-      .attr("text-anchor", "middle").text("Top of hourly rate (US$)");
+      .attr("text-anchor", "middle").text(B.axis);
 
     // median of everything shown
     svg.append("line").attr("x1", M.l).attr("x2", width - M.r).attr("y1", y(med)).attr("y2", y(med))
@@ -505,7 +553,7 @@
           .attr("stroke", "#0f172a").attr("stroke-width", 2.5).attr("stroke-linecap", "round");
       }
       const spread = Math.min(band * 0.72, Math.max(boxW, 30 + Math.sqrt(g.n) * 4)); // big groups get room
-      for (const j of g.js) nodes.push({ j, g, px: x + jitter(j.id) * spread * 0.48, py: y(j.h) });
+      for (const j of g.js) nodes.push({ j, g, px: x + jitter(j.id) * spread * 0.48, py: y(yv(j)) });
     });
     // rarer colors drawn last so they are not buried
     if (S.color) {
@@ -639,14 +687,15 @@
     if (S.color && !["field"].includes(S.color)) rows.push([DIMS[DI[S.color]].label, val(j, S.color)]);
     if (!["site"].includes(S.x) && S.color !== "site") rows.splice(1, 0, ["Site", j.s]);
     return `<b>${esc(j.t)}</b><span class="muted">${esc(j.co || j.s)}</span>
-      <div class="big"><span class="sw" style="background:${col.of(j)}"></span>${money(j.h)}/hr</div>
+      <div class="big"><span class="sw" style="background:${col.of(j)}"></span>${money(yv(j))}${S.basis === "hour" ? "/hr" : " per " + (j.unit || "piece")}</div>
       <div class="muted">as stated: ${esc(payText(j))}</div>
+      ${j.ev.Converted ? `<div class="muted">${esc(j.ev.Converted)}</div>` : ""}
       <table>${rows.map(([a, b]) => `<tr><td class="muted">${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</table>
       <div class="muted" style="margin-top:6px">${touch ? "Tap again" : "Click"} to see it in the table</div>`;
   }
 
   function groupTip(g) {
-    const rows = [["Jobs", fmtInt(g.n)], ["Median", money(g.med) + "/hr"]];
+    const rows = [["Jobs", fmtInt(g.n)], ["Median", money(g.med) + BASES[S.basis].unit]];
     if (g.n >= MIN_BOX) rows.push(["Middle half", `${money(g.q1)} – ${money(g.q3)}`]);
     rows.push(["Lowest – highest", `${money(g.v[0])} – ${money(g.v[g.v.length - 1])}`]);
     return `<b>${esc(g.label)}</b><table>${rows.map(([a, b]) => `<tr><td class="muted">${a}</td><td>${b}</td></tr>`).join("")}</table>` +
@@ -655,7 +704,7 @@
 
   function renderLegend(col) {
     const el = $("#legend");
-    if (!S.color) { el.innerHTML = ""; return; }
+    if (!S.color || !col.items.length) { el.innerHTML = ""; return; }
     el.innerHTML = `<span class="ttl">${esc(DIMS[DI[S.color]].label)}</span>` + col.items.map((it) =>
       `<button type="button" class="item${it.on ? "" : " off"}" data-k="${it.k}" title="Click to hide or show">
         <span class="sw" style="background:${it.color}"></span>${esc(it.label)} <span class="n">${fmtInt(it.n)}</span></button>`).join("") +
@@ -702,11 +751,13 @@
       const t = payText(j);
       const tags = [];
       if (j.pmax != null && j.pmin == null) tags.push(`<span class="tag warn">only "up to"</span>`);
-      else if (val(j, "pay").includes("varies")) tags.push(`<span class="tag warn">varies</span>`);
-      if (val(j, "usd") === DIMS[DI.usd].values.find((v) => v.includes("assumed"))) tags.push(`<span class="tag">"$" assumed US$</span>`);
+      else if (val(j, "pay").startsWith("Varies")) tags.push(`<span class="tag warn">varies</span>`);
+      if (val(j, "cur").includes("assumed")) tags.push(`<span class="tag">"$" assumed US$</span>`);
+      if (val(j, "cur").startsWith("Converted")) tags.push(`<span class="tag">converted</span>`);
+      if (j.unit === "year" || j.unit === "month") tags.push(`<span class="tag">salary, 40 h/week</span>`);
       return (t ? esc(t) : `<span class="muted">${esc(val(j, "pay"))}</span>`) + (tags.length ? "<br>" + tags.join(" ") : "");
     } },
-    { k: "h", label: "Top $/hr", num: true, sort: (j) => j.h, cell: (j) => (j.h != null ? `<span class="hr">${money(j.h)}</span>` : `<span class="muted">–</span>`) },
+    { k: "h", label: "Top US$", num: true, sort: (j) => yv(j), cell: (j) => (yv(j) != null ? `<span class="hr">${money(yv(j))}</span>` : `<span class="muted">–</span>`) },
     { k: "field", label: "Field", dim: true },
     { k: "who", label: "Who can apply", sort: (j) => j.w + whoText(j), cell: (j) => esc(whoText(j)) },
     { k: "mode", label: "Work mode", dim: true },
@@ -737,8 +788,9 @@
     sortRows();
     $("#table-title").textContent = `${fmtInt(filtered.length)} jobs`;
     const thead = $("#table thead");
+    const label = (c) => (c.k !== "h" ? c.label : S.basis === "hour" ? "Top US$/hr" : S.basis === "piece" ? "Top US$ per piece" : "Top US$");
     thead.innerHTML = "<tr>" + COLS.map((c) => `<th class="${c.num ? "num" : ""}" data-k="${c.k}" ${c.sort ? "" : 'style="cursor:default"'}>` +
-      `${esc(c.label)}${S.ts === c.k ? `<span class="arr">${S.td < 0 ? "↓" : "↑"}</span>` : ""}</th>`).join("") + "</tr>";
+      `${esc(label(c))}${S.ts === c.k ? `<span class="arr">${S.td < 0 ? "↓" : "↑"}</span>` : ""}</th>`).join("") + "</tr>";
     thead.querySelectorAll("th").forEach((th) => th.onclick = () => {
       const c = COLS.find((x) => x.k === th.dataset.k);
       if (!c.sort) return;
@@ -774,7 +826,9 @@
     const ev = j.ev, why = (v, k) => (ev[k] ? `${v} (${ev[k]})` : v);
     const items = [
       ["Pay", why(payText(j) || val(j, "pay"), "Pay read from")],
-      ["Used in the chart", j.h != null ? money(j.h) + "/hr (top of the range)" : "not in the chart: " + val(j, "pay").toLowerCase()],
+      ["Used in the chart", j.h != null ? money(j.h) + "/hr (top of the range), under \u201cPer hour\u201d"
+        : j.pt != null ? `${money(j.pt)} per ${j.unit || "piece"} (top of the range), under \u201cPer task or project\u201d` : "not in the chart: no pay figure"],
+      ["Conversion", ev["Converted"]],
       ["Pay as written", ev["Pay as written"]],
       ["Currency", ev["Currency"]],
       ["Why pay varies", ev["Why pay varies"]],
@@ -817,12 +871,12 @@
 
   function downloadCsv() {
     sortRows();
-    const head = ["title", "company", "site", "url", "pay_as_stated", "top_hourly_usd", ...DIMS.map((d) => d.label),
+    const head = ["title", "company", "site", "url", "pay_as_stated", "top_usd_per_hour", "top_usd_per_piece", "conversion", ...DIMS.map((d) => d.label),
       "who_can_apply", "countries", "places_listed", "posted"];
     const q = (s) => { s = String(s ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const lines = [head.map(q).join(",")];
     for (const j of tableRows) {
-      lines.push([j.t, j.co, j.s, j.u, payText(j), j.h ?? "", ...DIMS.map((d) => d.values[j.c[DI[d.key]]]),
+      lines.push([j.t, j.co, j.s, j.u, payText(j), j.h ?? "", j.pt ?? "", j.ev.Converted || "", ...DIMS.map((d) => d.values[j.c[DI[d.key]]]),
         whoText(j), j.pl.join("; "), j.loc.join("; "), j.posted].map(q).join(","));
     }
     const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });

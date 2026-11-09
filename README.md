@@ -21,11 +21,16 @@ Standard library only (Python 3.11+). Charts (`data/plots/`, with a short write-
 ## Public page
 
 `docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
-job's hourly rate in US$ (same number as the charts), grouped and colored by any of site, type of site,
-field, degree, experience, work mode, who can apply, kind of job, how pay is stated and why it is taken
-as US$, with filters (including "open to people in <country>") shared by the chart and the table below it.
+job's pay range in US$, grouped and colored by any of site, type of site, field, degree, experience, work
+mode, who can apply, kind of job, what the pay is per, how it is stated and its currency, with filters
+(including "open to people in <country>") shared by the chart and the table below it. A switch shows one
+pay basis at a time: per hour, per task or project (task, project, session), or jobs with no pay figure.
 The view is kept in the address, so a link reopens it.
 
+- Per hour includes salaries when the listing gives no hourly rate, at 40 hours a week (year ÷ 2,080 h,
+  month ÷ 173.3 h).
+- Other currencies are converted to US$ with the European Central Bank rates (frankfurter.dev), fetched
+  once per snapshot into `data/fx.json` so rebuilding gives the same numbers; delete it to refetch.
 - `docs/data/jobs.json` is rebuilt by every `collect` run (or alone: `python3 -m annotationjobs.site`):
   one record per distinct open job, with the sentences behind each value. Commit and push it to update
   the page.

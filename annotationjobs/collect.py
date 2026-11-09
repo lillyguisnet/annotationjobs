@@ -140,7 +140,8 @@ def reparse(only=None):
             rebuilt = RAW_PAGES[src](src, rows)
             print(f"   {src:24} rebuilt {rebuilt} records from raw pages")
         for r in rows.values():
-            if "pay_site" not in r:  # stored before the site's own pay was kept apart
+            # stored before the site's own pay was kept apart; Alignerr's was once read with its pay frequency as the unit
+            if "pay_site" not in r or src == "alignerr":
                 r["pay_site"] = site_pay_from_record(r, lever)
                 if src == "handshake":
                     r["degrees_from_site"] = bool(r.get("degrees"))
