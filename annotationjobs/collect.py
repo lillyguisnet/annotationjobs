@@ -10,6 +10,7 @@ Store (in git):
   data/seen.json                 uid -> [first_seen, last_seen]
   data/sources.json              per source: kind, counts, last run, last error
   data/dropped/<source>.tsv      titles on company boards judged not annotation work
+Public page (GitHub Pages): docs/, its data docs/data/jobs.json rebuilt with the table.
 Raw responses (not in git): /mnt/bulk/lilly/annotationjobs/raw/<date>/<source>/
 """
 
@@ -185,6 +186,9 @@ def write_outputs():
     (DATA / "index.html").write_text(page.replace("/*DATA*/null", data.replace("</", "<\\/")))
     act = sum(r["active"] for r in rows)
     print(f"page: {len(rows)} listings ({act} open) from {len(sources)} sources -> {DATA / 'index.html'}")
+    from .site import build  # the public page (docs/); imported here because site.py reads the store through this module
+
+    build()
 
 
 def main():

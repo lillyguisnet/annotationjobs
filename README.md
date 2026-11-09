@@ -18,6 +18,20 @@ Standard library only (Python 3.11+). Charts (`data/plots/`, with a short write-
 `data/plots/README.md`): `uv run --no-project --with matplotlib python -m annotationjobs.plots`. Open `data/index.html` through a web server
 (`python3 -m http.server -d data`) so "full listing" can load the text.
 
+## Public page
+
+`docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
+job's hourly rate in US$ (same number as the charts), grouped and colored by any of site, type of site,
+field, degree, experience, work mode, who can apply, kind of job, how pay is stated and why it is taken
+as US$, with filters (including "open to people in <country>") shared by the chart and the table below it.
+The view is kept in the address, so a link reopens it.
+
+- `docs/data/jobs.json` is rebuilt by every `collect` run (or alone: `python3 -m annotationjobs.site`):
+  one record per distinct open job, with the sentences behind each value. Commit and push it to update
+  the page.
+- Groupings shared with the charts live in `annotationjobs/groups.py`.
+- Try it locally: `python3 -m http.server -d docs`.
+
 ## What is kept
 
 - `data/listings/<source>.jsonl`: one listing per line with its **full text** (`text`), the
