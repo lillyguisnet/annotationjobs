@@ -156,7 +156,7 @@ def alignerr(board):
         raw = fetch(f"https://www.alignerr.com/_next/data/{build}/en/jobs/{j['id']}.json")
         save_raw(board["source"], j["id"] + ".json", raw)
         x = json.loads(raw)["pageProps"]["job"]
-        unit = {"HOURLY": "hour", "YEARLY": "year", "MONTHLY": "month"}.get(x.get("salaryType"), (x.get("salaryType") or "").lower())
+        unit = "hour"  # the fields are hourly rates (the site shows "$40-80/hr"); salaryType is how often it pays
         place = ", ".join(v for v in (x.get("city"), x.get("state"), x.get("countryCode")) if v)
         return listing(
             "Alignerr", board["source"], x["id"], x.get("name") or j["title"], f"https://www.alignerr.com/jobs/{x['id']}",

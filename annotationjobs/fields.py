@@ -34,7 +34,8 @@ def site_pay_from_record(r, lever_raw=None):
     if src == "mercor":
         return _site(x.get("rateMin"), x.get("rateMax"), None, UNIT_ALIASES.get(x.get("payRateFrequency"), x.get("payRateFrequency")))
     if src == "alignerr":
-        return _site(x.get("lowerBoundHourlyRate"), x.get("upperBoundHourlyRate"), None, UNIT_ALIASES.get(x.get("salaryType"), "hour"))
+        # the fields are hourly rates (the site shows "$40-80/hr"); salaryType (MONTHLY on a few) is how often it pays
+        return _site(x.get("lowerBoundHourlyRate"), x.get("upperBoundHourlyRate"), None, "hour")
     if src == "micro1":
         d = x.get("detail") or {}
         if _f(d.get("ideal_hourly_rate")):
@@ -104,7 +105,9 @@ def derive(r, board):
         if not cur:  # site shows "$" with no code: does the text name the currency?
             named = [m for m in mentions if m["explicit_currency"]]
             match = [m for m in named if m["unit"] == unit and abs(m["max"] - hi) < 0.01] or \
-                    [m for m in named if m["unit"] == unit] or named
+                    [m for m in named if m["unit"] == unit] or \
+                    [m for m in named if abs(m["max"] - hi) < 0.01] or \
+                    [m for m in named if m["unit"] and m["near_pay_word"] and not m["not_pay"]]
             if match:
                 cur, cur_src = match[0]["currency"], "text: …" + match[0]["quote"][:120] + "…"
             else:

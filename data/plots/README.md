@@ -4,7 +4,7 @@ Snapshot of 2026-11-06: **2,653 distinct jobs** (8,032 postings; a job posted on
 country counts once), open listings only. Made with
 `uv run --no-project --with matplotlib python -m annotationjobs.plots`.
 
-How to read the pay charts: only jobs paid **per hour in US dollars** are compared (1,571 jobs),
+How to read the pay charts: only jobs paid **per hour in US dollars** are compared (1,573 jobs),
 using the **top** of each range, so "up to $125" counts as $125. Boxes show the middle half of
 the jobs, the thick line is the median, each dot is one job. The pay axis is logarithmic: each
 step doubles.

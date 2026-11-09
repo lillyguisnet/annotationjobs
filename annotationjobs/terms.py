@@ -22,7 +22,8 @@ POST = {"USD": "USD", "CAD": "CAD", "AUD": "AUD", "NZD": "NZD", "SGD": "SGD", "H
         "£": "GBP", "EUROS": "EUR", "EURO": "EUR", "DOLLARS": "USD"}
 _pre = "|".join(sorted((re.escape(k) for k in PRE if k not in ("R",)), key=len, reverse=True))
 _post = "|".join(sorted((re.escape(k) for k in POST), key=len, reverse=True))
-NUM = r"\d{1,3}(?:[,\u202f ]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
+# thousands groups ("1,200", "1 200"), a decimal comma ("14,70 EUR", "18,5USD": one or two digits), or a plain number
+NUM = r"\d{1,3}(?:[,\u202f ]\d{3})+(?:\.\d+)?|\d+,\d{1,2}(?![\d,])|\d+(?:\.\d+)?"
 MONEY = re.compile(
     rf"(?P<pre>(?<![A-Za-z])(?:{_pre})(?:\s?\$)?)?\s?(?P<n>{NUM})\s?(?P<k>[kKmM]\b)?(?:\s?(?P<post>(?:{_post}))(?![A-Za-z]))?",
     re.I,
@@ -53,7 +54,7 @@ CONTEXT_UNIT = [("hour", r"hourly|per hour|an hour|/hr\b|/h\b|par heure|por hora
 
 
 def _num(s, k):
-    v = float(re.sub(r"[,\u202f ]", "", s))
+    v = float(s.replace(",", ".")) if re.fullmatch(r"\d+,\d{1,2}", s) else float(re.sub(r"[,\u202f ]", "", s))
     if k and k.lower() == "k":
         v *= 1000
     elif k and k.lower() == "m":
