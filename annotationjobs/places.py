@@ -253,6 +253,10 @@ ISO = {
     "CRI": "Costa Rica", "CR": "Costa Rica", "PRI": "Puerto Rico", "PR": "Puerto Rico", "VEN": "Venezuela", "VE": "Venezuela",
     "ECU": "Ecuador", "EC": "Ecuador", "LUX": "Luxembourg", "LU": "Luxembourg", "ISL": "Iceland", "IS": "Iceland",
     "CYP": "Cyprus", "CY": "Cyprus", "MLT": "Malta", "MT": "Malta",
+    "LIE": "Liechtenstein", "MCO": "Monaco", "SMR": "San Marino", "ALB": "Albania", "BIH": "Bosnia and Herzegovina",
+    "XKX": "Kosovo", "MKD": "North Macedonia", "MDA": "Moldova", "SLV": "El Salvador", "GTM": "Guatemala",
+    "PAN": "Panama", "HND": "Honduras", "NIC": "Nicaragua", "CUB": "Cuba", "DOM": "Dominican Republic",
+    "BOL": "Bolivia", "PRY": "Paraguay", "GUY": "Guyana",
 }
 
 
