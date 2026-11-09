@@ -14,7 +14,8 @@ python3 -m annotationjobs.collect --page-only         # rebuild the page and CSV
 python3 -m annotationjobs.collect --list              # all sources
 ```
 
-Standard library only (Python 3.11+). Open `data/index.html` through a web server
+Standard library only (Python 3.11+). Charts (`data/plots/`, with a short write-up in
+`data/plots/README.md`): `uv run --no-project --with matplotlib python -m annotationjobs.plots`. Open `data/index.html` through a web server
 (`python3 -m http.server -d data`) so "full listing" can load the text.
 
 ## What is kept
@@ -56,6 +57,8 @@ All of this is redone from the stored text, without fetching, by `--reparse`
   a note only: on DataAnnotation it is the same sentence on every role, including roles paying
   at most $40/hr (which would need 5,000 hours a year to reach $200k), so no per-role pay is
   derived from it.
+- A site pay field of $1 or less per hour or per project is a placeholder (e.g. Appen's
+  "$0.01 one-time") and is ignored, with a note.
 - No figure: `pay_note` says what the listing says instead ("paid per task, amount not stated",
   "rate varies…", "compensation shared later", "competitive"), `pay_text` quotes it.
 - Kind of job (`contract_type`, `contract_evidence`): contractor (freelance, independent

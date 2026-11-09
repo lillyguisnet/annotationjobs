@@ -94,6 +94,10 @@ def derive(r, board):
     site = r.get("pay_site")
     r["pay_all"] = [[m["min"], m["max"], m["currency"], m["unit"], m["quote"][:220]] for m in mentions[:12]]
     note = ""
+    placeholder = ""
+    if site and site["max"] is not None and site["max"] <= 1 and site["unit"] in ("hour", "project", "day", "week", "month", "year"):
+        placeholder = f"the site's pay field holds a placeholder (${site['max']:g}/{site['unit']}); ignored"
+        site = None
     if site:
         lo, hi, unit = site["min"], site["max"], site["unit"]
         cur, cur_src = site["currency"], "site field"
@@ -128,6 +132,8 @@ def derive(r, board):
         r["pay_text"] = quote
     r.update(pay_min=lo, pay_max=hi, pay_currency=cur or "", pay_unit=unit or "", pay_source=src,
              pay_currency_source=cur_src, pay_note=note)
+    if placeholder:
+        r["pay_note"] = placeholder + ("; " + note if note else "")
     if src == "text" or (best and not r.get("pay_text")):
         r["pay_text"] = best["quote"] if best else ""
     # engagement type
