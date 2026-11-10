@@ -440,11 +440,19 @@
 
     const med = d3.median(pts, yv);
     $("#chart-title").textContent = S.basis === "none" ? B.title : `${B.title} by ${xd.label.toLowerCase()}`;
-    $("#chart-sub").innerHTML = S.basis === "none"
+    // jobs matching the filters but under another pay basis: say so, with a link (e.g. a site whose jobs state no pay)
+    const elsewhere = { hour: 0, piece: 0, none: 0 };
+    const narrowed = S.q || S.live || Object.keys(S.f).length;
+    if (narrowed) for (const j of JOBS) if (basisOf(j) !== S.basis && passes(j, "basis")) elsewhere[basisOf(j)]++;
+    const also = Object.entries(elsewhere).filter(([, n]) => n)
+      .map(([k, n]) => `<button type="button" class="linkbtn" data-basis="${k}">${fmtInt(n)} under \u201c${esc(BASES[k].label)}\u201d</button>`);
+    const alsoText = also.length ? ` <span class="also">Also matching: ${also.join(", ")}.</span>` : "";
+    $("#chart-sub").innerHTML = (S.basis === "none"
       ? `<b>${fmtInt(filtered.length)}</b> jobs match your filters but give no pay figure that could be read. They are listed in the table, with what each listing says about pay.`
       : pts.length
         ? `${B.sub}. <b>${fmtInt(pts.length)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>).`
-        : `No job matches these filters.`;
+        : `No job matches these filters.`) + alsoText;
+    $("#chart-sub").querySelectorAll("[data-basis]").forEach((b) => b.onclick = () => setBasis(b.dataset.basis));
     const cd = S.color ? DIMS[DI[S.color]] : null;
     $("#chart-note").innerHTML = `<b>${esc(xd.label)}:</b> ${esc(xd.help)}` + (cd && cd !== xd ? ` <b>${esc(cd.label)}:</b> ${esc(cd.help)}` : "");
     renderLegend(col);
@@ -500,7 +508,8 @@
     if (!pts.length) {
       svg.attr("height", 120).attr("viewBox", `0 0 ${width} 120`);
       svg.append("text").attr("class", "empty").attr("x", width / 2).attr("y", 60).attr("text-anchor", "middle")
-        .text(S.basis === "none" ? "Nothing to plot: these jobs give no pay figure. See the table below." : "No job matches these filters.");
+        .text(S.basis === "none" ? "Nothing to plot: these jobs give no pay figure. See the table below."
+          : also.length ? "No job here: see \u201cAlso matching\u201d above." : "No job matches these filters.");
       chartState = null;
       return;
     }
@@ -804,7 +813,9 @@
       return `<tr class="job${j.id === S.sel ? " sel" : ""}" data-id="${esc(j.id)}">` +
         COLS.map((c) => `<td class="${c.num ? "num" : ""}${c.nowrap ? " nowrap" : ""}">${c.cell(j)}</td>`).join("") + "</tr>" +
         (open ? `<tr class="detail"><td colspan="${COLS.length}">${detail(j)}</td></tr>` : "");
-    }).join("") || `<tr><td colspan="${COLS.length}" class="muted" style="padding:28px 20px">No job matches these filters.</td></tr>`;
+    }).join("") || `<tr><td colspan="${COLS.length}" class="muted" style="padding:28px 20px">No job matches these filters` +
+      `${$("#chart-sub .also") ? " here. " + $("#chart-sub .also").innerHTML : "."}</td></tr>`;
+    $("#table tbody").querySelectorAll("[data-basis]").forEach((b) => b.onclick = () => setBasis(b.dataset.basis));
     $("#table tbody").querySelectorAll("tr.job").forEach((tr) => tr.onclick = (e) => {
       if (e.target.closest("a")) return;
       const id = tr.dataset.id;
