@@ -13,7 +13,9 @@
   const MIN_BOX = 5; // fewer jobs than this: dots only, no box
   const ACCENT = "#2563eb";
   const OTHER = "#b8bfca";
-  const PALETTE = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#ff8ab7", "#a463f2", "#97bbf5", "#9c6b4e"];
+  // 12 colors, most distinct first (the largest groups get the first ones); grey is kept for the rest
+  const PALETTE = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#ff8ab7", "#a463f2", "#97bbf5", "#9c6b4e",
+    "#1d2b53", "#8a8f1c", "#7a1f3d"];
   const RAMP = d3.interpolateRgbBasis(["#f2b134", "#e4572e", "#b8336a", "#5b2a86", "#16324f"]);
   const NEUTRAL = new Set(["Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated"]);
   const FILTER_ORDER = ["field", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "cur"];
@@ -37,6 +39,7 @@
   let tableRows = [];
   const S = {
     ...DEFAULTS, f: {}, q: "", live: "", unclear: true, min: null, max: null,
+    hl: new Set(), legendMode: "hide", // highlighted values of the color grouping; what a click on the legend does
     ts: "h", td: -1, limit: 100, sel: null, open: new Set(),
   };
 
@@ -141,6 +144,12 @@
         setFilter(d.key, new Set(d.values.map((_, i) => i).filter((i) => !out.has(i))));
       }
     }
+    S.hl = new Set();
+    if (S.color && p.get("hl") != null) {
+      const vals = DIMS[DI[S.color]].values;
+      for (const v of p.get("hl").split("|")) if (vals.includes(v)) S.hl.add(vals.indexOf(v));
+    }
+    if (S.hl.size) S.legendMode = "highlight";
     S.q = p.get("q") || "";
     S.live = COUNTRIES.includes(p.get("live")) ? p.get("live") : "";
     S.unclear = p.get("unclear") !== "0";
@@ -159,6 +168,7 @@
       if (on.size > vals.length / 2) p.set("not." + k, vals.filter((_, i) => !on.has(i)).join("|"));
       else p.set("f." + k, [...on].map((i) => vals[i]).join("|"));
     }
+    if (S.color && S.hl.size) p.set("hl", [...S.hl].map((i) => DIMS[DI[S.color]].values[i]).join("|"));
     if (S.q) p.set("q", S.q);
     if (S.live) p.set("live", S.live);
     if (!S.unclear) p.set("unclear", "0");
@@ -174,7 +184,7 @@
     const x = $("#x"), color = $("#color"), sort = $("#sort");
     x.value = S.x; color.value = S.color; sort.value = S.sort;
     x.onchange = () => { S.x = x.value; update(); };
-    color.onchange = () => { S.color = color.value; update(); };
+    color.onchange = () => { S.color = color.value; S.hl = new Set(); update(); };
     sort.onchange = () => { S.sort = sort.value; update(); };
     for (const b of document.querySelectorAll("#scale button")) {
       b.onclick = () => { S.scale = b.dataset.v; update(); };
@@ -227,7 +237,10 @@
 
   function setBasis(v) {
     if (v === S.basis) return;
-    if (S.color === BASES[S.basis].color) S.color = BASES[v].color; // follow the suggested coloring unless it was changed
+    if (S.color === BASES[S.basis].color && S.color !== BASES[v].color) { // follow the suggested coloring unless it was changed
+      S.color = BASES[v].color;
+      S.hl = new Set();
+    }
     $("#color").value = S.color;
     S.basis = v;
     S.min = S.max = null; // a per-hour limit means nothing per task
@@ -405,23 +418,24 @@
   // ---------------------------------------------------------------- colors
 
   function colors(ptsAll) {
-    // ptsAll: chart points ignoring the filter on the color grouping, so hidden values stay in the legend
+    // ptsAll: chart points ignoring the filter on the color grouping, so hidden values stay in the legend.
+    // Only the values still shown get a color, so hiding one hands its color to the next largest.
     if (!S.color) return { of: () => ACCENT, items: [] };
     const ci = DI[S.color], d = DIMS[ci];
     const n = new Map();
     for (const j of ptsAll) n.set(j.c[ci], (n.get(j.c[ci]) || 0) + 1);
+    const on = (k) => !S.f[S.color] || S.f[S.color].has(k);
     const map = new Map();
+    const shown = [...n.keys()].filter((k) => on(k) && !NEUTRAL.has(d.values[k]));
     if (d.ordinal) {
-      const scale = d.values.map((v, k) => k).filter((k) => !NEUTRAL.has(d.values[k]));
-      scale.forEach((k, r) => map.set(k, RAMP(scale.length === 1 ? 0.5 : r / (scale.length - 1))));
+      shown.sort((a, b) => a - b).forEach((k, r) => map.set(k, RAMP(shown.length === 1 ? 0.5 : r / (shown.length - 1))));
     } else {
-      const keys = [...n.keys()].filter((k) => !NEUTRAL.has(d.values[k])).sort((a, b) => n.get(b) - n.get(a) || a - b);
-      keys.slice(0, PALETTE.length).forEach((k, r) => map.set(k, PALETTE[r]));
+      shown.sort((a, b) => n.get(b) - n.get(a) || a - b).slice(0, PALETTE.length).forEach((k, r) => map.set(k, PALETTE[r]));
     }
     const of = (j) => map.get(j.c[ci]) || OTHER;
-    const keys = [...n.keys()].sort((a, b) => (d.ordinal ? a - b : (map.has(b) - map.has(a)) || n.get(b) - n.get(a) || a - b));
-    const items = keys.map((k) => ({ k, label: d.values[k], n: n.get(k), color: map.get(k) || OTHER, on: !S.f[S.color] || S.f[S.color].has(k) }));
-    return { of, items };
+    const keys = [...n.keys()].sort((a, b) => (d.ordinal ? a - b : n.get(b) - n.get(a) || a - b)); // legend order does not move
+    const items = keys.map((k) => ({ k, label: d.values[k], n: n.get(k), color: map.get(k) || OTHER, on: on(k), hl: S.hl.has(k) }));
+    return { of, items, ci };
   }
 
   // ---------------------------------------------------------------- chart
@@ -570,10 +584,8 @@
       nodes.sort((a, b) => (freq.get(b.j.c[ci]) || 0) - (freq.get(a.j.c[ci]) || 0));
     }
     const r = pts.length > 1200 ? 2.6 : pts.length > 400 ? 3 : 3.6;
-    gDot.selectAll("circle").data(nodes).join("circle")
-      .attr("cx", (d) => d.px).attr("cy", (d) => d.py).attr("r", r)
-      .attr("fill", (d) => col.of(d.j)).attr("fill-opacity", colored ? 0.8 : 0.5)
-      .attr("stroke", "#fff").attr("stroke-width", 0.5).attr("stroke-opacity", 0.8);
+    const dots = gDot.selectAll("circle").data(nodes).join("circle")
+      .attr("cx", (d) => d.px).attr("cy", (d) => d.py).attr("fill", (d) => col.of(d.j));
 
     // x labels (click: show only this group)
     const gX = svg.append("g");
@@ -650,8 +662,26 @@
       if (p.d) selectJob(p.d.j.id, true);
     });
     medLabel();
-    chartState = { nodes, selRing };
+    chartState = { nodes, selRing, dots, r, colored, ci: col.ci };
+    styleDots();
     drawSelection();
+  }
+
+  // highlighted values pop (bigger, opaque, on top), the rest fade; `preview` is a legend hover
+  function styleDots(preview) {
+    if (!chartState) return;
+    const { dots, r, colored, ci } = chartState;
+    const H = preview || S.hl;
+    const lit = (d) => H.has(d.j.c[ci]);
+    if (!colored || !H.size) {
+      dots.attr("r", r).attr("fill-opacity", colored ? 0.8 : 0.5).attr("stroke", "#fff").attr("stroke-width", 0.5).attr("stroke-opacity", 0.8);
+      return;
+    }
+    dots.attr("r", (d) => (lit(d) ? r * 1.45 : r * 0.9)).attr("fill-opacity", (d) => (lit(d) ? 1 : 0.12))
+      .attr("stroke", (d) => (lit(d) ? "#0f172a" : "#fff")).attr("stroke-width", (d) => (lit(d) ? 0.7 : 0.5))
+      .attr("stroke-opacity", (d) => (lit(d) ? 0.55 : 0.4));
+    dots.filter(lit).raise();
+    chartState.selRing.raise();
   }
 
   function drawSelection() {
@@ -714,18 +744,47 @@
   function renderLegend(col) {
     const el = $("#legend");
     if (!S.color || !col.items.length) { el.innerHTML = ""; return; }
-    el.innerHTML = `<span class="ttl">${esc(DIMS[DI[S.color]].label)}</span>` + col.items.map((it) =>
-      `<button type="button" class="item${it.on ? "" : " off"}" data-k="${it.k}" title="Click to hide or show">
-        <span class="sw" style="background:${it.color}"></span>${esc(it.label)} <span class="n">${fmtInt(it.n)}</span></button>`).join("") +
-      (col.items.filter((i) => i.color === OTHER && !NEUTRAL.has(i.label)).length > 1
-        ? `<span class="n" style="align-self:center">Grey: groups beyond the ${PALETTE.length} largest.</span>` : "");
-    el.querySelectorAll(".item").forEach((b) => b.onclick = () => {
-      const d = DIMS[DI[S.color]], k = +b.dataset.k;
-      const cur = S.f[S.color] ? new Set(S.f[S.color]) : new Set(d.values.map((_, i) => i));
-      cur.has(k) ? cur.delete(k) : cur.add(k);
-      if (cur.size === 0) return; // keep at least one
-      setFilter(S.color, cur);
-      update();
+    for (const k of [...S.hl]) if (!col.items.some((it) => it.k === k && it.on)) S.hl.delete(k); // hidden: no highlight
+    const hiMode = S.legendMode === "highlight", anyHl = S.hl.size > 0;
+    const greyed = col.items.filter((i) => i.on && i.color === OTHER && !NEUTRAL.has(i.label)).length;
+    el.innerHTML = `<div class="legend-head"><span class="ttl">${esc(DIMS[DI[S.color]].label)}</span>
+        <span class="mode">Click a color to
+          <span class="seg mini" role="group" aria-label="What a click on the legend does">
+            <button type="button" data-mode="hide" class="${hiMode ? "" : "on"}">hide it</button><button type="button" data-mode="highlight" class="${hiMode ? "on" : ""}">highlight it</button>
+          </span></span>
+        ${anyHl ? `<button type="button" class="linkbtn" data-clearhl>Clear highlight</button>` : ""}
+        ${col.items.some((i) => !i.on) ? `<button type="button" class="linkbtn" data-showall>Show all</button>` : ""}
+      </div>
+      <div class="legend-items">` + col.items.map((it) =>
+      `<button type="button" class="item${it.on ? "" : " off"}${it.hl ? " lit" : anyHl && it.on ? " dim" : ""}" data-k="${it.k}"
+          title="${it.on ? (hiMode ? "Click to highlight" : "Click to hide") : "Hidden: click to show again"}">
+        <span class="sw" style="${it.on ? `background:${it.color}` : "background:transparent;box-shadow:inset 0 0 0 1.5px #b8bfca"}"></span>${esc(it.label)} <span class="n">${fmtInt(it.n)}</span></button>`).join("") +
+      (greyed > 1 ? `<span class="n note-grey">Grey: shown groups beyond the ${PALETTE.length} largest. Hide some to free colors.</span>` : "") +
+      `</div>`;
+    el.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { S.legendMode = b.dataset.mode; renderLegend(col); });
+    const clearHl = el.querySelector("[data-clearhl]");
+    if (clearHl) clearHl.onclick = () => { S.hl = new Set(); update(); };
+    const showAll = el.querySelector("[data-showall]");
+    if (showAll) showAll.onclick = () => { delete S.f[S.color]; update(); };
+    el.querySelectorAll(".item").forEach((b) => {
+      const k = +b.dataset.k, it = col.items.find((i) => i.k === k);
+      b.onclick = () => {
+        if (it.on && hiMode) { // highlight: several at once, the chart's boxes and the table do not change
+          S.hl.has(k) ? S.hl.delete(k) : S.hl.add(k);
+          update();
+          return;
+        }
+        const d = DIMS[DI[S.color]];
+        const cur = S.f[S.color] ? new Set(S.f[S.color]) : new Set(d.values.map((_, i) => i));
+        cur.has(k) ? cur.delete(k) : cur.add(k);
+        if (cur.size === 0) return; // keep at least one
+        S.hl.delete(k);
+        setFilter(S.color, cur);
+        update();
+      };
+      // hovering previews the highlight (mouse only: on touch screens use "highlight it")
+      b.onpointerenter = (e) => { if (e.pointerType === "mouse" && it.on) styleDots(new Set([...S.hl, k])); };
+      b.onpointerleave = (e) => { if (e.pointerType === "mouse") styleDots(); };
     });
   }
 

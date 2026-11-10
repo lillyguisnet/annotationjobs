@@ -138,14 +138,24 @@ main { padding-top: 18px; padding-bottom: 40px; display: grid; gap: 18px; }
 .tip table { border-collapse: collapse; margin-top: 4px; }
 .tip td { padding: 1px 10px 1px 0; }
 .tip td + td { text-align: right; font-variant-numeric: tabular-nums; color: #fff; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 13px; }
+.legend { margin-top: 10px; font-size: 13px; }
 .legend:empty { display: none; }
-.legend .item { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 0; background: none; padding: 2px 0; color: var(--ink-2); }
-.legend .item:hover { color: var(--ink); }
-.legend .item.off { opacity: .35; text-decoration: line-through; }
+.legend-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 6px; }
+.legend .mode { color: var(--ink-3); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.seg.mini { height: 26px; border-radius: 999px; }
+.seg.mini button { font-size: 12.5px; padding: 0 10px; }
+.legend-items { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+.legend .item { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid transparent; background: none;
+  padding: 2px 8px 2px 6px; border-radius: 999px; color: var(--ink-2); transition: opacity .15s, background .15s; }
+.legend .item:hover { color: var(--ink); background: var(--bg); }
+.legend .item.off { opacity: .45; text-decoration: line-through; }
+.legend .item.dim { opacity: .5; }
+.legend .item.lit { background: #fff; border-color: var(--ink); color: var(--ink); font-weight: 600; }
 .legend .sw { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.legend .n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.legend .ttl { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; align-self: center; }
+.legend .item.lit .sw { box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--ink); }
+.legend .n { color: var(--ink-3); font-variant-numeric: tabular-nums; font-weight: 400; }
+.legend .note-grey { align-self: center; font-size: 12px; padding-left: 4px; }
+.legend .ttl { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .note { margin: 10px 0 0; color: var(--ink-3); font-size: 12.5px; }
 
 /* table */
