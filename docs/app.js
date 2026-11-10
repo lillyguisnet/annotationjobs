@@ -610,13 +610,12 @@
         .attr("fill", "transparent");
       if (rotate) {
         const lab = g.label.length > maxChars ? g.label.slice(0, maxChars - 1) + "…" : g.label;
-        const tx = t.append("text").attr("transform", "rotate(-45)").attr("text-anchor", "end").attr("dy", "0.32em");
+        // upright logo under the axis, the slanted name after it (all names start the same distance out, logo or not)
+        const tx = t.append("text").attr("transform", "rotate(-45)").attr("text-anchor", "end").attr("dy", "0.32em")
+          .attr("x", lw ? -(LOGO * Math.SQRT1_2 + LOGO_GAP) : 0); // the square's corner, not its side, faces the text
         tx.append("tspan").attr("class", "name").text(lab);
         tx.append("tspan").attr("class", "n").text(` ${g.n}`);
-        if (src) { // upright logo just before the start of the slanted name
-          const d = tx.node().getComputedTextLength() + LOGO_GAP + LOGO * Math.SQRT1_2; // corner of the square, not its side, faces the text
-          addLogo(t, src, -d * Math.SQRT1_2, d * Math.SQRT1_2);
-        }
+        if (src) addLogo(t, src, 0, 0);
       } else {
         const lines = wrapLabel(g.label, band - lw);
         const tx = t.append("text").attr("text-anchor", "middle");
