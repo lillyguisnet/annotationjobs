@@ -782,8 +782,8 @@
         setFilter(S.color, cur);
         update();
       };
-      // hovering previews the highlight (mouse only: on touch screens use "highlight it")
-      b.onpointerenter = (e) => { if (e.pointerType === "mouse" && it.on) styleDots(new Set([...S.hl, k])); };
+      // in "highlight it" mode, hovering previews the highlight (mouse only: touch screens have no hover)
+      b.onpointerenter = (e) => { if (e.pointerType === "mouse" && it.on && S.legendMode === "highlight") styleDots(new Set([...S.hl, k])); };
       b.onpointerleave = (e) => { if (e.pointerType === "mouse") styleDots(); };
     });
   }
