@@ -80,6 +80,12 @@ button, input, select { font: inherit; color: inherit; }
 .pop-row .only { visibility: hidden; border: 0; background: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0 2px; }
 .pop-row:hover .only { visibility: visible; }
 .pop-row.zero .lab { color: var(--ink-3); }
+.pop-row.zero .logo { opacity: .45; }
+/* site logos, before the site's name */
+.logo { width: 16px; height: 16px; flex: none; border-radius: 3px; object-fit: contain; vertical-align: -3px; }
+.site { display: inline-flex; align-items: flex-start; gap: 6px; }
+.site .logo { margin-top: 2px; }
+.legend .item .logo { margin-right: -1px; }
 .pop-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px 12px; border-top: 1px solid var(--line-soft); }
 .linkbtn { white-space: nowrap; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 13px; }
 .linkbtn:hover { text-decoration: underline; }

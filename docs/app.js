@@ -34,7 +34,14 @@
   const UNIT = { hour: "/hr", year: "/year", month: "/month", project: " per project", task: " per task", session: " per session" };
   const DEFAULTS = { basis: "hour", x: "field", color: "pay", sort: "auto", scale: "log" };
 
-  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE;
+  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE, LOGOS;
+  const LOGO = 16, LOGO_GAP = 5; // logo size and the space after it, in px
+  // small logo of a site, shown before its name (decorative: the name follows, so no alt text)
+  const logoSrc = (key, value) => (key === "site" && LOGOS[value]) || null;
+  const logoImg = (key, value) => {
+    const src = logoSrc(key, value);
+    return src ? `<img class="logo" src="${esc(src)}" alt="" width="${LOGO}" height="${LOGO}" decoding="async" onerror="this.remove()">` : "";
+  };
   let filtered = [];
   let tableRows = [];
   const S = {
@@ -56,6 +63,7 @@
     SNAPSHOT = data.snapshot;
     POSTINGS = data.postings;
     FXDATE = data.fx && data.fx.date;
+    LOGOS = data.logos || {};
     for (const j of JOBS) j.text = [j.t, j.co, j.s, ...j.loc, ...j.pl].join(" ").toLowerCase();
     const cc = new Map();
     for (const j of JOBS) if (j.w !== "except") for (const p of j.pl) cc.set(p, (cc.get(p) || 0) + 1);
@@ -305,7 +313,7 @@
       `<div class="pop-list">` + d.values.map((v, k) => `
         <label class="pop-row${counts[k] ? "" : " zero"}" data-k="${k}" ${search && !v.toLowerCase().includes(search.toLowerCase()) ? "hidden" : ""}>
           <input type="checkbox" data-k="${k}" ${!set || set.has(k) ? "checked" : ""}>
-          <span class="lab">${esc(v)}</span>
+          ${logoImg(id, v)}<span class="lab">${esc(v)}</span>
           <button type="button" class="only" data-only="${k}">only</button>
           <span class="n">${fmtInt(counts[k])}</span>
         </label>`).join("") + `</div>
@@ -501,11 +509,12 @@
     const minBand = small ? 34 : 40;
     const n = Math.max(groups.length, 1);
     const maxChars = 30;
+    const lw = groups.some((g) => logoSrc(S.x, g.label)) ? LOGO * Math.SQRT2 + LOGO_GAP : 0; // room for the logos before the names
     let width = Math.max(wrapW, M.l + M.r + n * minBand);
     let band = (width - M.l - M.r) / n;
     const rotate = band < 62;
     if (rotate && groups.length) { // slanted labels reach left of their group: make room for the furthest one
-      const reach = d3.max(groups, (g, i) => Math.min(g.label.length + 4, maxChars + 4) * 6.4 * Math.SQRT1_2 + 4 - i * minBand);
+      const reach = d3.max(groups, (g, i) => (Math.min(g.label.length + 4, maxChars + 4) * 6.4 + lw) * Math.SQRT1_2 + 4 - i * minBand);
       if (reach > M.l) {
         M.l = Math.ceil(reach);
         width = Math.max(wrapW, M.l + M.r + n * minBand);
@@ -513,8 +522,8 @@
       }
     }
     const longest = d3.max(groups, (g) => Math.min(g.label.length, maxChars)) || 0;
-    const nLines = rotate ? 0 : d3.max(groups, (g) => wrapLabel(g.label, band).length) || 1;
-    M.b = rotate ? 22 + longest * 6.4 * Math.sin(Math.PI / 4) : 30 + nLines * 14.5;
+    const nLines = rotate ? 0 : d3.max(groups, (g) => wrapLabel(g.label, band - lw).length) || 1;
+    M.b = rotate ? 22 + (longest * 6.4 + lw) * Math.SQRT1_2 : 30 + nLines * 14.5;
     const plotH = small ? 320 : 420;
     const height = M.t + plotH + M.b;
     svg.attr("width", width).attr("height", height).attr("viewBox", `0 0 ${width} ${height}`);
@@ -587,9 +596,14 @@
     const dots = gDot.selectAll("circle").data(nodes).join("circle")
       .attr("cx", (d) => d.px).attr("cy", (d) => d.py).attr("fill", (d) => col.of(d.j));
 
-    // x labels (click: show only this group)
+    // x labels (click: show only this group), with the site's logo before its name
     const gX = svg.append("g");
+    if (lw) svg.append("defs").append("clipPath").attr("id", "logo-clip").attr("clipPathUnits", "objectBoundingBox")
+      .append("rect").attr("width", 1).attr("height", 1).attr("rx", 0.2);
+    const addLogo = (t, src, cx, cy) => t.append("image").attr("href", src).attr("x", cx - LOGO / 2).attr("y", cy - LOGO / 2)
+      .attr("width", LOGO).attr("height", LOGO).attr("clip-path", "url(#logo-clip)");
     groups.forEach((g) => {
+      const src = logoSrc(S.x, g.label);
       const t = gX.append("g").attr("class", "xlabel").attr("transform", `translate(${g.x},${M.t + plotH + 14})`);
       t.append("title").text(`${g.label}: ${g.n} jobs. Click to show only this group.`);
       t.append("rect").attr("x", rotate ? -6 : -band / 2).attr("y", -10).attr("width", rotate ? 12 : band).attr("height", rotate ? 14 : 20 + nLines * 14.5)
@@ -599,10 +613,19 @@
         const tx = t.append("text").attr("transform", "rotate(-45)").attr("text-anchor", "end").attr("dy", "0.32em");
         tx.append("tspan").attr("class", "name").text(lab);
         tx.append("tspan").attr("class", "n").text(` ${g.n}`);
+        if (src) { // upright logo just before the start of the slanted name
+          const d = tx.node().getComputedTextLength() + LOGO_GAP + LOGO * Math.SQRT1_2; // corner of the square, not its side, faces the text
+          addLogo(t, src, -d * Math.SQRT1_2, d * Math.SQRT1_2);
+        }
       } else {
-        const lines = wrapLabel(g.label, band);
+        const lines = wrapLabel(g.label, band - lw);
         const tx = t.append("text").attr("text-anchor", "middle");
         lines.forEach((l, k) => tx.append("tspan").attr("class", "name").attr("x", 0).attr("dy", k ? "1.15em" : "0.32em").text(l));
+        if (src) { // logo + first line centered together under the group
+          const first = tx.select("tspan").attr("x", (LOGO + LOGO_GAP) / 2);
+          const w = first.node().getComputedTextLength();
+          addLogo(t, src, (LOGO + LOGO_GAP) / 2 - w / 2 - LOGO_GAP - LOGO / 2, 0);
+        }
         t.append("text").attr("class", "n").attr("text-anchor", "middle").attr("y", nLines * 14.5 + 2).attr("dy", "0.32em").text(`n=${g.n}`);
       }
       t.on("click", () => {
@@ -758,7 +781,7 @@
       <div class="legend-items">` + col.items.map((it) =>
       `<button type="button" class="item${it.on ? "" : " off"}${it.hl ? " lit" : anyHl && it.on ? " dim" : ""}" data-k="${it.k}"
           title="${it.on ? (hiMode ? "Click to highlight" : "Click to hide") : "Hidden: click to show again"}">
-        <span class="sw" style="${it.on ? `background:${it.color}` : "background:transparent;box-shadow:inset 0 0 0 1.5px #b8bfca"}"></span>${esc(it.label)} <span class="n">${fmtInt(it.n)}</span></button>`).join("") +
+        <span class="sw" style="${it.on ? `background:${it.color}` : "background:transparent;box-shadow:inset 0 0 0 1.5px #b8bfca"}"></span>${logoImg(S.color, it.label)}${esc(it.label)} <span class="n">${fmtInt(it.n)}</span></button>`).join("") +
       (greyed > 1 ? `<span class="n note-grey">Grey: shown groups beyond the ${PALETTE.length} largest. Hide some to free colors.</span>` : "") +
       `</div>`;
     el.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { S.legendMode = b.dataset.mode; renderLegend(col); });
@@ -814,7 +837,7 @@
   const COLS = [
     { k: "t", label: "Job", sort: (j) => j.t.toLowerCase(),
       cell: (j) => `<div class="t-title">${esc(j.t)}</div>${j.co ? `<div class="t-sub">${esc(j.co)}</div>` : ""}` },
-    { k: "s", label: "Site", sort: (j) => j.s.toLowerCase(), cell: (j) => esc(j.s) },
+    { k: "s", label: "Site", sort: (j) => j.s.toLowerCase(), cell: (j) => `<span class="site">${logoImg("site", j.s)}<span>${esc(j.s)}</span></span>` },
     { k: "pay", label: "Pay as stated", sort: null, cell: (j) => {
       const t = payText(j);
       const tags = [];

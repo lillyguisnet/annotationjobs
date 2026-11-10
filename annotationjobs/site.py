@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .collect import all_listings
 from .groups import FIELDS, KIND_NAME, RULES, degree_level, field
+from .logos import logo_paths
 from .places import COUNTRIES, ISO, STATE, normalize_places, places_in
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -231,7 +232,8 @@ def build():
         del j["cat"]
     jobs.sort(key=lambda j: (-(j["h"] or 0), j["t"]))
     data = {"snapshot": snapshot, "dims": dims, "jobs": jobs, "postings": sum(j["n"] for j in jobs),
-            "fx": {"date": fx["date"], "source": fx["source"]}}
+            "fx": {"date": fx["date"], "source": fx["source"]},
+            "logos": logo_paths(next(d["values"] for d in dims if d["key"] == "site"))}  # site -> its small logo (docs/logos/, python3 -m annotationjobs.logos)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     n_h, n_p = sum(j["h"] is not None for j in jobs), sum(j["pt"] is not None for j in jobs)

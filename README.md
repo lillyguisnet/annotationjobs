@@ -35,6 +35,10 @@ The view is kept in the address, so a link reopens it.
   one record per distinct open job, with the sentences behind each value. Commit and push it to update
   the page.
 - Groupings shared with the charts live in `annotationjobs/groups.py`.
+- Site logos (chart labels, legend, table, site filter) are the sites' own icons, downloaded once into
+  `docs/logos/` and served with the page: `python3 -m annotationjobs.logos` fetches the missing ones
+  (a new site needs its website added to `DOMAINS` in `annotationjobs/logos.py`); a site without one is
+  shown by name only.
 - Try it locally: `python3 -m http.server -d docs`.
 
 ## What is kept
