@@ -23,16 +23,13 @@
   <div class="wrap">
     <!-- three zones: which pay (pick one), search (free text), filters (narrow down, combinable) -->
     <div class="bar-row bar-main">
-      <div class="zone zone-pay" id="zone-pay">
-        <span class="zlabel" id="pay-label">Pay</span>
-      </div>
+      <div class="zone zone-pay" id="zone-pay"></div>
       <span class="vdiv" aria-hidden="true"></span>
       <label class="search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
         <input id="q" type="search" placeholder="Search titles, companies, places" autocomplete="off" aria-label="Search"></label>
     </div>
     <div class="bar-row bar-filters">
-      <span class="zlabel"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14l-5.5 6.5V16l-3 1.5v-7z"/></svg>Filters</span>
-      <div class="filters" id="filters"></div>
+      <div class="filters" id="filters" role="group" aria-label="Filters"></div>
     </div>
   </div>
 </div>

@@ -220,7 +220,7 @@
     seg.className = "seg basis";
     seg.id = "basis";
     seg.setAttribute("role", "radiogroup");
-    seg.setAttribute("aria-labelledby", "pay-label");
+    seg.setAttribute("aria-label", "Pay basis");
     seg.innerHTML = Object.entries(BASES).map(([k, b]) =>
       `<button type="button" role="radio" data-v="${k}">${esc(b.label)}<span class="n"></span></button>`).join("");
     seg.querySelectorAll("button").forEach((b) => b.onclick = () => setBasis(b.dataset.v));
