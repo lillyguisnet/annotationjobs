@@ -30,6 +30,7 @@ button, input, select { font: inherit; color: inherit; }
 .hero h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.02em; font-weight: 750; }
 .lede { margin: 10px 0 0; color: #c4cee0; max-width: 820px; }
 .lede b { color: #fff; font-weight: 650; }
+.lede .line { display: block; }
 
 /* sticky filter bar: three zones, each with its own look
    - Pay: a segmented switch on a grey track (pick exactly one), with its pay range next to it

@@ -22,9 +22,9 @@
   // pay basis: one at a time, a per-hour and a per-task figure do not belong on the same axis
   const BASES = {
     hour: { label: "Per hour", unit: "/hr", axis: "Top of hourly rate (US$)", title: "Hourly pay", color: "pay",
-      sub: "Top of each job's hourly rate in US$ (salaries at 40 hours a week, other currencies converted)" },
+      sub: "Top of each job's hourly rate range in US$ equivalent." },
     piece: { label: "Per task or project", unit: "", axis: "Top of pay per task, project or session (US$)", title: "Pay per task or project",
-      color: "unit", sub: "Top of each job's pay per task, project or session in US$ (other currencies converted)" },
+      color: "unit", sub: "Top of each job's pay range per task, project or session in US$ equivalent." },
     none: { label: "No pay figure", unit: "", axis: "", title: "Jobs with no pay figure", color: "pay", sub: "" },
   };
   const yv = (j) => (S.basis === "hour" ? j.h : S.basis === "piece" ? j.pt : null);
@@ -78,9 +78,13 @@
     bindControls();
     const sites = new Set(JOBS.map((j) => j.s)).size;
     const nh = JOBS.filter((j) => j.h != null).length, np = JOBS.filter((j) => j.pt != null).length;
-    $("#lede").innerHTML = `<b>${fmtInt(JOBS.length)}</b> open jobs (${fmtInt(POSTINGS)} postings once each city's copy is counted) ` +
-      `from <b>${sites}</b> sites: contributor platforms, data companies' own boards, AI labs and big tech. ` +
-      `<b>${fmtInt(nh)}</b> give an hourly rate or a salary, <b>${fmtInt(np)}</b> a rate per task or project. Collected ${niceDate(SNAPSHOT)}.`;
+    const medAll = d3.median(JOBS, (j) => j.h);
+    $("#lede").innerHTML = [
+      `<b>${fmtInt(JOBS.length)}</b> open jobs (${fmtInt(POSTINGS)} postings with each city's copy counted) from <b>${sites}</b> sites.`,
+      `<b>${fmtInt(nh)}</b> give an hourly rate or a salary, <b>${fmtInt(np)}</b> a rate per task or project.`,
+      `Overall median: <b>${money(medAll)}/hr</b>.`,
+      `Collected ${niceDate(SNAPSHOT)}.`,
+    ].map((l) => `<span class="line">${l}</span>`).join("");
     $("#foot").innerHTML = `Data collected ${niceDate(SNAPSHOT)} from the sites' public job pages. ` +
       (FXDATE ? `Other currencies converted to US$ at the European Central Bank rates of ${niceDate(FXDATE)}. ` : "") +
       `Code, method and full data: <a href="https://github.com/lillyguisnet/annotationjobs">github.com/lillyguisnet/annotationjobs</a>.`;
@@ -492,7 +496,7 @@
     $("#chart-sub").innerHTML = (S.basis === "none"
       ? `<b>${fmtInt(filtered.length)}</b> jobs match your filters but give no pay figure that could be read. They are listed in the table, with what each listing says about pay.`
       : pts.length
-        ? `${B.sub}. <b>${fmtInt(pts.length)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>).`
+        ? `${B.sub}<br><b>${fmtInt(pts.length)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>).`
         : `No job matches these filters.`) + alsoText;
     $("#chart-sub").querySelectorAll("[data-basis]").forEach((b) => b.onclick = () => setBasis(b.dataset.basis));
     const cd = S.color ? DIMS[DI[S.color]] : null;
