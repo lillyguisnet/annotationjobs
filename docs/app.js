@@ -42,12 +42,13 @@
     const src = logoSrc(key, value);
     return src ? `<img class="logo" src="${esc(src)}" alt="" width="${LOGO}" height="${LOGO}" decoding="async" onerror="this.remove()">` : "";
   };
+  const PAGE = 10; // table rows shown at first, and added by "Show more"
   let filtered = [];
   let tableRows = [];
   const S = {
     ...DEFAULTS, f: {}, q: "", live: "", unclear: true, min: null, max: null,
     hl: new Set(), legendMode: "hide", // highlighted values of the color grouping; what a click on the legend does
-    ts: "h", td: -1, limit: 100, sel: null, open: new Set(),
+    ts: "h", td: -1, limit: PAGE, sel: null, open: new Set(),
   };
 
   // ---------------------------------------------------------------- data
@@ -197,7 +198,7 @@
     for (const b of document.querySelectorAll("#scale button")) {
       b.onclick = () => { S.scale = b.dataset.v; update(); };
     }
-    $("#q").addEventListener("input", debounce((e) => { S.q = e.target.value.trim(); S.limit = 100; update(); }, 150));
+    $("#q").addEventListener("input", debounce((e) => { S.q = e.target.value.trim(); S.limit = PAGE; update(); }, 150));
     $("#csv").onclick = downloadCsv;
     document.addEventListener("pointerdown", (e) => {
       if (!$("#pop").hidden && !e.target.closest("#pop") && !e.target.closest(".fbtn")) closePop();
@@ -208,37 +209,56 @@
     });
   }
 
+  // short names for the filter buttons (the popover shows the full name and what it means)
+  const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", site: "Site", kind: "Site type", who: "Who can apply",
+    mode: "Work mode", degree: "Degree", years: "Experience", contract: "Job type", unit: "Paid per", pay: "Pay clarity", cur: "Currency" };
+  const SMALL = matchMedia("(max-width: 720px)");
+
   function buildFilterButtons() {
-    const box = $("#filters");
+    const zone = $("#zone-pay");
     const seg = document.createElement("div");
     seg.className = "seg basis";
     seg.id = "basis";
-    seg.setAttribute("role", "group");
-    seg.setAttribute("aria-label", "Pay basis");
-    seg.innerHTML = Object.entries(BASES).map(([k, b]) => `<button type="button" data-v="${k}">${esc(b.label)} <span class="n"></span></button>`).join("");
+    seg.setAttribute("role", "radiogroup");
+    seg.setAttribute("aria-labelledby", "pay-label");
+    seg.innerHTML = Object.entries(BASES).map(([k, b]) =>
+      `<button type="button" role="radio" data-v="${k}">${esc(b.label)}<span class="n"></span></button>`).join("");
     seg.querySelectorAll("button").forEach((b) => b.onclick = () => setBasis(b.dataset.v));
-    box.insertBefore(seg, box.firstChild);
-    const mk = (id, label) => {
+    zone.appendChild(seg);
+    const mk = (id) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "fbtn"; b.dataset.f = id; b.setAttribute("aria-expanded", "false");
-      b.innerHTML = `<span class="l">${esc(label)}</span><span class="caret"></span>`;
       b.onclick = () => ($("#pop").dataset.f === id && !$("#pop").hidden ? closePop() : openPop(id, b));
-      box.appendChild(b);
+      return b;
     };
-    mk("live", "Open to people in");
-    mk("pay$", "Pay range");
-    for (const k of FILTER_ORDER) mk(k, DIMS[DI[k]].label);
+    const box = $("#filters");
+    for (const id of ["live", "field", "site", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
+    // filters about pay sit with the pay switch (the range's unit follows it); on a phone they lead the scrolling filter row
+    const payFilters = ["pay$", "unit", "pay", "cur"].map(mk);
+    const payBox = document.createElement("div");
+    payBox.className = "filters pay-filters";
+    zone.appendChild(payBox);
+    const place = () => (SMALL.matches ? box.prepend(...payFilters) : payBox.append(...payFilters));
+    place();
+    SMALL.addEventListener("change", () => { closePop(); place(); });
   }
 
   function refreshFilterButtons() {
     for (const b of document.querySelectorAll(".fbtn")) {
       const id = b.dataset.f;
-      let on = false, label = id === "live" ? "Open to people in" : id === "pay$" ? "Pay range" : DIMS[DI[id]].label, badge = "";
-      if (id === "live" && S.live) { on = true; label = "Open to people in " + S.live; }
-      else if (id === "pay$" && (S.min != null || S.max != null)) { on = true; label = "Pay " + rangeText(); }
-      if (id === "pay$") b.hidden = S.basis === "none";
-      else if (S.f[id]) { on = true; badge = S.f[id].size; }
+      let on = false, label = BTN[id], badge = "";
+      if (id === "live") { if (S.live) { on = true; label = "Open to people in " + S.live; } }
+      else if (id === "pay$") {
+        b.hidden = S.basis === "none";
+        if (S.min != null || S.max != null) { on = true; label = rangeText() + BASES[S.basis].unit; }
+      } else if (S.f[id]) {
+        on = true;
+        const t = filterText(id);
+        if (t) label = `${BTN[id]}: ${t.length > 24 ? t.slice(0, 23) + "…" : t}`;
+        else badge = S.f[id].size;
+      }
       b.classList.toggle("on", on);
+      b.title = on ? `${DIMS[DI[id]]?.label || BTN[id]}: click to change` : "";
       b.innerHTML = `<span class="l">${esc(label)}</span>${badge ? `<span class="badge">${badge}</span>` : ""}<span class="caret"></span>`;
     }
   }
@@ -252,7 +272,7 @@
     $("#color").value = S.color;
     S.basis = v;
     S.min = S.max = null; // a per-hour limit means nothing per task
-    S.limit = 100;
+    S.limit = PAGE;
     update();
   }
 
@@ -261,7 +281,7 @@
     for (const j of JOBS) if (passes(j, "basis")) n[basisOf(j)]++;
     for (const b of document.querySelectorAll("#basis button")) {
       b.classList.toggle("on", b.dataset.v === S.basis);
-      b.setAttribute("aria-pressed", b.dataset.v === S.basis);
+      b.setAttribute("aria-checked", b.dataset.v === S.basis);
       b.querySelector(".n").textContent = fmtInt(n[b.dataset.v]);
     }
   }
@@ -323,7 +343,7 @@
       const cur = S.f[id] ? new Set(S.f[id]) : new Set(d.values.map((_, k) => k));
       cb.checked ? cur.add(+cb.dataset.k) : cur.delete(+cb.dataset.k);
       setFilter(id, cur);
-      S.limit = 100;
+      S.limit = PAGE;
       update();
     });
     pop.querySelectorAll("[data-only]").forEach((b) => b.onclick = (e) => {
@@ -356,7 +376,7 @@
           <span>Also keep jobs that do not say who can apply (${fmtInt(unclear)})</span></label>
         <p class="hint">Read from the listings automatically: check the listing itself before applying.</p>
       </div>`;
-    pop.querySelector("#live").onchange = (e) => { S.live = e.target.value; S.limit = 100; update(); };
+    pop.querySelector("#live").onchange = (e) => { S.live = e.target.value; S.limit = PAGE; update(); };
     pop.querySelector("#unclear").onchange = (e) => { S.unclear = e.target.checked; update(); };
   }
 
@@ -373,7 +393,7 @@
       const a = pop.querySelector("#pmin").value, b = pop.querySelector("#pmax").value;
       S.min = a === "" ? null : +a;
       S.max = b === "" ? null : +b;
-      S.limit = 100;
+      S.limit = PAGE;
       update();
     }, 250);
     pop.querySelector("#pmin").oninput = read;
@@ -383,30 +403,30 @@
     };
   }
 
-  // ---------------------------------------------------------------- chips
+  // ---------------------------------------------------------------- active filters
+  // Each filter button says what it holds ("Field: Law", "Site · 3"); one "Clear all" at the end of the row.
 
-  function renderChips() {
-    const chips = [];
-    if (S.q) chips.push(["Search", `“${S.q}”`, () => { S.q = ""; $("#q").value = ""; }]);
-    if (S.live) chips.push(["Open to people in", S.live + (S.unclear ? " (plus jobs that don't say)" : ""), () => { S.live = ""; }]);
-    if (S.min != null || S.max != null) chips.push(["Pay", rangeText() + BASES[S.basis].unit, () => { S.min = S.max = null; }]);
-    for (const k of FILTER_ORDER) {
-      if (!S.f[k]) continue;
-      const d = DIMS[DI[k]];
-      const on = [...S.f[k]].sort((a, b) => a - b);
-      const text = on.length <= d.values.length / 2 || on.length <= 3
-        ? on.map((i) => d.values[i]).join(", ")
-        : "all but " + d.values.filter((_, i) => !S.f[k].has(i)).join(", ");
-      chips.push([d.label, text, () => { delete S.f[k]; }]);
-    }
-    const el = $("#chips");
-    el.innerHTML = chips.map(([a, b], i) => `<span class="chip"><span><b>${esc(a)}:</b> ${esc(b)}</span>` +
-      `<button type="button" data-i="${i}" aria-label="Remove filter">×</button></span>`).join("") +
-      (chips.length > 1 ? `<button type="button" class="chip clear" id="clear-all">Clear all</button>` : "");
-    el.querySelectorAll("button[data-i]").forEach((b) => b.onclick = () => { chips[+b.dataset.i][2](); S.limit = 100; update(); });
-    const ca = $("#clear-all");
-    if (ca) ca.onclick = () => { S.f = {}; S.q = ""; $("#q").value = ""; S.live = ""; S.min = S.max = null; S.limit = 100; update(); };
+  function filterText(k) { // short description of a dimension filter, or "" when it is off
+    if (!S.f[k]) return "";
+    const d = DIMS[DI[k]], on = [...S.f[k]].sort((a, b) => a - b);
+    const off = d.values.filter((_, i) => !S.f[k].has(i));
+    if (on.length === 1) return d.values[on[0]];
+    if (off.length === 1) return "not " + off[0];
+    return "";
   }
+
+  function renderClearAll() {
+    let btn = $("#clear-all");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button"; btn.id = "clear-all"; btn.className = "clear-all";
+      btn.textContent = "Clear all";
+      btn.onclick = () => { S.f = {}; S.q = ""; $("#q").value = ""; S.live = ""; S.min = S.max = null; S.limit = PAGE; update(); };
+      $("#filters").appendChild(btn);
+    }
+    btn.hidden = !(S.q || S.live || S.min != null || S.max != null || Object.keys(S.f).length);
+  }
+
 
   // ---------------------------------------------------------------- update
 
@@ -415,7 +435,7 @@
     for (const b of document.querySelectorAll("#scale button")) b.classList.toggle("on", b.dataset.v === S.scale);
     refreshBasis();
     refreshFilterButtons();
-    renderChips();
+    renderClearAll();
     renderChart();
     renderTable();
     fillPop();
@@ -630,7 +650,7 @@
       t.on("click", () => {
         const cur = S.f[S.x];
         setFilter(S.x, cur && cur.size === 1 && cur.has(g.k) ? null : new Set([g.k]));
-        S.limit = 100;
+        S.limit = PAGE;
         update();
       });
     });
@@ -907,9 +927,9 @@
     const more = $("#more");
     if (tableRows.length > S.limit) {
       more.innerHTML = `Showing ${fmtInt(S.limit)} of ${fmtInt(tableRows.length)}
-        <button type="button" class="btn" data-more>Show ${fmtInt(Math.min(100, tableRows.length - S.limit))} more</button>
+        <button type="button" class="btn" data-more>Show ${fmtInt(Math.min(PAGE, tableRows.length - S.limit))} more</button>
         <button type="button" class="btn" data-allrows>Show all</button>`;
-      more.querySelector("[data-more]").onclick = () => { S.limit += 100; renderTable(); };
+      more.querySelector("[data-more]").onclick = () => { S.limit += PAGE; renderTable(); };
       more.querySelector("[data-allrows]").onclick = () => { S.limit = tableRows.length; renderTable(); };
     } else more.innerHTML = "";
   }
@@ -947,7 +967,7 @@
     S.open.add(id);
     sortRows();
     const i = tableRows.findIndex((j) => j.id === id);
-    if (i >= S.limit) S.limit = Math.ceil((i + 1) / 100) * 100;
+    if (i >= S.limit) S.limit = Math.ceil((i + 1) / PAGE) * PAGE;
     renderTable();
     drawSelection();
     if (fromChart) {
