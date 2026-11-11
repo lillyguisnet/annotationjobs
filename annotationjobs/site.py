@@ -19,8 +19,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from . import categories as C
 from .collect import all_listings
-from .groups import FIELDS, KIND_NAME, RULES, degree_level, field
+from .groups import KIND_NAME, RULES, degree_level
 from .logos import logo_paths
 from .places import COUNTRIES, ISO, STATE, normalize_places, places_in
 from .terms import pay_factors
@@ -52,8 +53,13 @@ DIMS = [
     ("site", "Site", "Where the job is posted.", None, False),
     ("kind", "Type of site", "Contributor platforms (Mercor, Outlier...), data companies' own job boards, AI labs, big tech.",
      list(KIND_NAME.values()), False),
-    ("field", "Field", "Guessed from the job title by keywords, so some jobs land in the wrong field.",
-     [n for n, _ in FIELDS] + ["Other"], False),
+    ("field", "Field", "The specialist knowledge the job asks for, read from the full listing by a language model "
+     "(GPT-6.1 Terra). Open a job in the table to see the sentences it used.",
+     [n for n, _ in C.FIELDS.values()] + [C.NOT_SORTED], False),
+    ("task", "Kind of task", "What the work mainly is, read from the full listing by a language model (GPT-6.1 Terra).",
+     [n for n, _ in C.TASKS.values()] + [C.NOT_SORTED], False),
+    ("lang", "Language", "The language other than English the job requires. Jobs asking for two or more are under "
+     "\u201cSeveral languages\u201d; the search box finds each language.", None, False),
     ("degree", "Degree mentioned", "Highest degree the listing mentions (mentioned, not necessarily required).", DEGREES, True),
     ("years", "Experience asked", "Smallest number of years of experience the listing asks for.", YEARS, True),
     ("mode", "Work mode", "Remote, hybrid or on site.", list(MODES.values()), False),
@@ -183,7 +189,13 @@ def clip(s, n=320):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def quotes(pairs):
+    """The model's evidence passages that are really in the listing."""
+    return " … ".join(q for q, found in pairs or [] if found)
+
+
 def build():
+    labels = C.load()
     rows, _ = all_listings()
     groups = collections.defaultdict(list)
     for r in rows:
@@ -197,10 +209,13 @@ def build():
         locations = list(dict.fromkeys(p for r in copies for p in (r.get("location") or "").split("; ") if p.strip()))
         if j.get("location_rule") == "only listed places":  # copies of one job can name different places
             j = j | {"allowed_places": list(dict.fromkeys(p for r in copies for p in r.get("allowed_places") or []))}
+        lab = C.label_for(copies, labels) or {}
         cat = {
             "site": j["site"],
             "kind": KIND_NAME[j["kind"]],
-            "field": field(j["title"]),
+            "field": C.FIELDS[lab["field"]][0] if lab else C.NOT_SORTED,
+            "task": C.TASKS[lab["task"]][0] if lab else C.NOT_SORTED,
+            "lang": C.language_group(lab["languages"]) if lab else C.NOT_SORTED,
             "degree": {"none": DEGREES[0], "MD / JD": "MD / JD"}.get(degree_level(j.get("degrees")), degree_level(j.get("degrees"))),
             "years": years_bucket(j),
             "mode": MODES.get(j.get("work_mode") or "", "Not stated"),
@@ -225,6 +240,10 @@ def build():
             "Experience": clip(j.get("experience_text")),
             "Degrees mentioned": j.get("degrees") or "",
             "Hours per week": str(j["hours_per_week"]) if j.get("hours_per_week") else "",
+            "Field": clip(quotes(lab.get("field_evidence"))),
+            "Kind of task": clip(quotes(lab.get("task_evidence"))),
+            "Languages": ", ".join(lab.get("varieties") or C.languages(lab)),
+            "Languages, as written": clip(quotes(lab.get("languages_evidence"))),
             "Converted": how,
         }
         jobs.append({
@@ -233,6 +252,7 @@ def build():
             "pmin": j["pay_min"], "pmax": j["pay_max"], "cur": j.get("pay_currency") or "", "unit": j.get("pay_unit") or "",
             "h": _r(hourly), "pt": _r(piece), "cat": cat, "w": RULE_CODE[j.get("location_rule") or ""],
             "pl": places_of(j, locations), "loc": locations[:12], "nloc": len(locations), "n": len(copies),
+            "lg": list(dict.fromkeys(C.languages(lab) + (lab.get("varieties") or []))),  # for the search box
             "first": min(r["first_seen"] for r in copies), "posted": j.get("posted") or "",
             "ev": {k: v for k, v in evidence.items() if v},
         })
@@ -256,6 +276,10 @@ def build():
     n_h, n_p = sum(j["h"] is not None for j in jobs), sum(j["pt"] is not None for j in jobs)
     print(f"site: {len(jobs)} jobs ({n_h} paid per hour, {n_p} per task or project), snapshot {snapshot} -> {OUT.relative_to(ROOT)}"
           f" ({OUT.stat().st_size / 1e6:.1f} MB)")
+    missing = sum(not C.label_for(c, labels) for c in groups.values())
+    if missing:
+        print(f"site: {missing} jobs not sorted into field / task / language yet: "
+              "uv run --no-project --with lm15==1.5.0 python -m annotationjobs.categorize", file=sys.stderr)
 
 
 if __name__ == "__main__":

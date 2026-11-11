@@ -17,7 +17,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from .groups import KIND_NAME, PAY_CLASSES, RULES, degree_level, field, hourly_usd, pay_class  # noqa: E402
+from . import categories as C  # noqa: E402
+from .groups import KIND_NAME, PAY_CLASSES, RULES, degree_level, hourly_usd, pay_class  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -114,11 +115,16 @@ def pay_by_site(jobs):
 
 # --- 3. hourly pay by field ------------------------------------------------------------------------
 
-def pay_by_field(jobs):
+def pay_by_field(rows, jobs):
+    labels_ = C.load()
+    copies = collections.defaultdict(list)
+    for r in rows:
+        copies[r["group"]].append(r)
     g = collections.defaultdict(list)
     allf = collections.Counter()
     for j in jobs:
-        f = field(j["title"])
+        lab = C.label_for(copies[j["group"]], labels_)
+        f = C.FIELDS[lab["field"]][0] if lab else C.NOT_SORTED
         allf[f] += 1
         h = hourly_usd(j)
         if h is not None:
@@ -132,7 +138,7 @@ def pay_by_field(jobs):
     ax.set_xlim(1.6, 600)
     ax.minorticks_off()
     ax.set_xlabel("top of the hourly rate, US$")
-    ax.set_title("Hourly pay by field (field guessed from the job title)")
+    ax.set_title("Hourly pay by field (read from the listing by a language model)")
     save(fig, "3-hourly-pay-by-field.png")
     print("jobs per field:", dict(allf.most_common()))
     for f in labels:
@@ -281,7 +287,7 @@ def main():
     rows, jobs = load()
     jobs_by_site(rows, jobs)
     pay_by_site(jobs)
-    pay_by_field(jobs)
+    pay_by_field(rows, jobs)
     pay_vs_requirements(jobs)
     pay_clarity(jobs)
     who_can_apply(jobs)

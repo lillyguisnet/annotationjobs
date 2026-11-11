@@ -4,12 +4,18 @@
     python3 -m annotationjobs.collect --only mercor,gh-xai
     python3 -m annotationjobs.collect --page-only     # rebuild page/CSV from the store
     python3 -m annotationjobs.collect --reparse       # re-read pay/type/years from stored text, no fetching
+    python3 -m annotationjobs.collect --no-categorize # skip sorting new jobs into field / task / language
+
+After fetching, new jobs are sorted into field / task / language by a language model
+(annotationjobs/categorize.py, run through uv because it needs lm15); jobs it could not sort
+show as "Not sorted yet" until it is run again.
 
 Store (in git):
   data/listings/<source>.jsonl   one listing per line, full text, kept after it closes
   data/seen.json                 uid -> [first_seen, last_seen]
   data/sources.json              per source: kind, counts, last run, last error
   data/dropped/<source>.tsv      titles on company boards judged not annotation work
+  data/categories.jsonl          field / languages / task of each job, with the model's evidence
 Public page (GitHub Pages): docs/, its data docs/data/jobs.json rebuilt with the table.
 Raw responses (not in git): /mnt/bulk/lilly/annotationjobs/raw/<date>/<source>/
 """
@@ -18,6 +24,8 @@ import argparse
 import csv
 import gzip
 import json
+import shutil
+import subprocess
 import sys
 import time
 import traceback
@@ -192,12 +200,24 @@ def write_outputs():
     build()
 
 
+def categorize():
+    """Sort new jobs (annotationjobs/categorize.py); it needs lm15, so it runs through uv."""
+    uv = shutil.which("uv")
+    if not uv:
+        print("categorize: skipped, uv not found; new jobs show as \"Not sorted yet\"", file=sys.stderr)
+        return
+    cmd = [uv, "run", "-q", "--no-project", "--with", "lm15==1.5.0", "python", "-m", "annotationjobs.categorize"]
+    if subprocess.run(cmd, cwd=ROOT).returncode:
+        print("categorize: some jobs not sorted (see above); run it again later", file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="comma-separated sources")
     ap.add_argument("--page-only", action="store_true")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--reparse", action="store_true")
+    ap.add_argument("--no-categorize", action="store_true", help="do not sort new jobs with the language model")
     a = ap.parse_args()
     if a.list:
         for b in BOARDS:
@@ -208,6 +228,8 @@ def main():
         reparse(only)
     elif not a.page_only:
         collect(only)
+        if not a.no_categorize:
+            categorize()
     write_outputs()
 
 

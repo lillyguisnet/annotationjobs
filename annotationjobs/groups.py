@@ -12,6 +12,8 @@ LANGS = ("Spanish|French|German|Italian|Portuguese|Japanese|Korean|Chinese|Manda
          "Vietnamese|Thai|Indonesian|Malay|Filipino|Tagalog|Burmese|Khmer|Lao|Nepali|Sinhala|Swahili|Amharic|Yoruba|Igbo|"
          "Hausa|Zulu|Xhosa|Afrikaans|Somali|Catalan|Basque|Galician|Welsh|Irish|Maltese|Luxembourgish|Lingala|Siswati|"
          "Kyrgyz|Tajik|Mongolian|Pashto|Dari|Kurdish|Haitian|Quechua|Guarani|Maori|Samoan|Hawaiian|Cherokee|Navajo")
+# The old field guess from the title by keywords. No longer used by the page or the charts (they use
+# the model's answers, categories.py); kept because experiments/categorize/ draws its samples by it.
 FIELDS = [  # first match wins, on the title
     ("Medicine & health", r"physician|doctor|\bmd\b|\bdo\b|nurse|\brn\b|medical|clinic|health|surgeon|radiolog|oncolog|cardiolog|"
                           r"neurolog|psychiatr|patholog|pharma|dentist|dental|therap|anesthes|pediatric|obstetric|gynec|"

@@ -17,8 +17,8 @@
   const PALETTE = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#ff8ab7", "#a463f2", "#97bbf5", "#9c6b4e",
     "#1d2b53", "#8a8f1c", "#7a1f3d"];
   const RAMP = d3.interpolateRgbBasis(["#f2b134", "#e4572e", "#b8336a", "#5b2a86", "#16324f"]);
-  const NEUTRAL = new Set(["Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated", "Not said"]);
-  const FILTER_ORDER = ["field", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "dep", "cur"];
+  const NEUTRAL = new Set(["Not sorted yet", "English only", "Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated", "Not said"]);
+  const FILTER_ORDER = ["field", "task", "lang", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "dep", "cur"];
   // pay basis: one at a time, a per-hour and a per-task figure do not belong on the same axis
   const BASES = {
     hour: { label: "Per hour", unit: "/hr", axis: "Top of hourly rate (US$)", title: "Hourly pay", color: "pay",
@@ -65,7 +65,7 @@
     POSTINGS = data.postings;
     FXDATE = data.fx && data.fx.date;
     LOGOS = data.logos || {};
-    for (const j of JOBS) j.text = [j.t, j.co, j.s, ...j.loc, ...j.pl].join(" ").toLowerCase();
+    for (const j of JOBS) j.text = [j.t, j.co, j.s, ...j.loc, ...j.pl, ...(j.lg || [])].join(" ").toLowerCase();
     const cc = new Map();
     for (const j of JOBS) if (j.w !== "except") for (const p of j.pl) cc.set(p, (cc.get(p) || 0) + 1);
     COUNTRIES = [...cc].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([c]) => c);
@@ -214,7 +214,7 @@
   }
 
   // short names for the filter buttons (the popover shows the full name and what it means)
-  const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", site: "Site", kind: "Site type", who: "Who can apply",
+  const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", task: "Task", lang: "Language", site: "Site", kind: "Site type", who: "Who can apply",
     mode: "Work mode", degree: "Degree", years: "Experience", contract: "Job type", unit: "Paid per", pay: "Pay clarity", dep: "Rate set by", cur: "Currency" };
   const SMALL = matchMedia("(max-width: 720px)");
 
@@ -236,7 +236,7 @@
       return b;
     };
     const box = $("#filters");
-    for (const id of ["live", "field", "site", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
+    for (const id of ["live", "field", "task", "lang", "site", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
     // filters about pay sit with the pay switch (the range's unit follows it); on a phone they lead the scrolling filter row
     const payFilters = ["pay$", "unit", "pay", "dep", "cur"].map(mk);
     const payBox = document.createElement("div");
@@ -768,8 +768,8 @@
   function hideTip() { $("#tip").hidden = true; }
 
   function jobTip(j, col, touch) {
-    const rows = [["Field", val(j, "field")], ["Who can apply", whoText(j)]];
-    if (S.color && !["field"].includes(S.color)) rows.push([DIMS[DI[S.color]].label, val(j, S.color)]);
+    const rows = [["Field", val(j, "field")], ["Task", val(j, "task")], ["Who can apply", whoText(j)]];
+    if (S.color && !["field", "task"].includes(S.color)) rows.push([DIMS[DI[S.color]].label, val(j, S.color)]);
     if (!["site"].includes(S.x) && S.color !== "site") rows.splice(1, 0, ["Site", j.s]);
     return `<b>${esc(j.t)}</b><span class="muted">${esc(j.co || j.s)}</span>
       <div class="big"><span class="sw" style="background:${col.of(j)}"></span>${money(yv(j))}${S.basis === "hour" ? "/hr" : " per " + (j.unit || "piece")}</div>
@@ -874,6 +874,7 @@
     } },
     { k: "h", label: "Top US$", num: true, sort: (j) => yv(j), cell: (j) => (yv(j) != null ? `<span class="hr">${money(yv(j))}</span>` : `<span class="muted">–</span>`) },
     { k: "field", label: "Field", dim: true },
+    { k: "task", label: "Task", dim: true },
     { k: "who", label: "Who can apply", sort: (j) => j.w + whoText(j), cell: (j) => esc(whoText(j)) },
     { k: "mode", label: "Work mode", dim: true },
     { k: "years", label: "Experience", dim: true },
@@ -957,7 +958,9 @@
       ["Experience asked", why(val(j, "years"), "Experience")],
       ["Degrees mentioned", ev["Degrees mentioned"]],
       ["Hours per week", ev["Hours per week"]],
-      ["Field (from the title)", val(j, "field")],
+      ["Field", why(val(j, "field"), "Field")],
+      ["Kind of task", why(val(j, "task"), "Kind of task")],
+      ["Languages", ev["Languages"] ? why(ev["Languages"], "Languages, as written") : ""],
       ["Type of site", val(j, "kind")],
       ["Places listed", j.loc.length ? j.loc.join("; ") + (j.nloc > j.loc.length ? ` and ${j.nloc - j.loc.length} more` : "") : ""],
       ["Countries read", j.pl.join(", ")],

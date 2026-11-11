@@ -14,14 +14,15 @@ python3 -m annotationjobs.collect --page-only         # rebuild the page and CSV
 python3 -m annotationjobs.collect --list              # all sources
 ```
 
-Standard library only (Python 3.11+). Charts (`data/plots/`, with a short write-up in
+Standard library only (Python 3.11+), except the step that sorts jobs by field, task and language
+with a language model (it needs `lm15` and runs through `uv`, see below). Charts (`data/plots/`, with a short write-up in
 `data/plots/README.md`): `uv run --no-project --with matplotlib python -m annotationjobs.plots`. Open `data/index.html` through a web server
 (`python3 -m http.server -d data`) so "full listing" can load the text.
 
 ## Public page
 
 `docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
-job's pay range in US$, grouped and colored by any of site, type of site, field, degree, experience, work
+job's pay range in US$, grouped and colored by any of site, type of site, field, kind of task, language, degree, experience, work
 mode, who can apply, kind of job, what the pay is per, how it is stated (a figure or range, or only "up to"),
 what the listing says it depends on, and its currency, with filters
 (including "open to people in <country>") shared by the chart and the table below it. A switch shows one
@@ -35,7 +36,7 @@ The view is kept in the address, so a link reopens it.
 - `docs/data/jobs.json` is rebuilt by every `collect` run (or alone: `python3 -m annotationjobs.site`):
   one record per distinct open job, with the sentences behind each value. Commit and push it to update
   the page.
-- Groupings shared with the charts live in `annotationjobs/groups.py`.
+- Groupings shared with the charts live in `annotationjobs/groups.py` and `annotationjobs/categories.py`.
 - Site logos (chart labels, legend, table, site filter) are the sites' own icons, downloaded once into
   `docs/logos/` and served with the page: `python3 -m annotationjobs.logos` fetches the missing ones
   (a new site needs its website added to `DOMAINS` in `annotationjobs/logos.py`); a site without one is
@@ -51,6 +52,9 @@ The view is kept in the address, so a link reopens it.
 - `data/sources.json`: per source, the last run, counts and the last error.
 - `data/dropped/<source>.tsv`: postings on company boards left out as not annotation work
   (engineers, sales...), with the reason, so the filter can be checked.
+- `data/categories.jsonl`: each job's field, languages and kind of task, with the passages the
+  model quoted as evidence and whether each is really in the listing (one line per distinct
+  site + title + text; a later line for the same text wins).
 - `data/jobs.csv`, `data/index.html`: the table, built from the above.
 - Raw responses, byte for byte, of every run (all postings, kept or not):
   `/mnt/bulk/lilly/annotationjobs/raw/<date>/<source>/` (not in git).
@@ -106,6 +110,35 @@ All of this is redone from the stored text, without fetching, by `--reparse`
 - Degrees: degrees *mentioned* in the text, required or not.
 - Company boards (`vendor`, `lab`, `bigtech`): kept only when the title reads as annotation /
   AI-training work (`classify` in `annotationjobs/common.py`).
+
+## Field, kind of task and language (language model)
+
+A language model, GPT-6.1 Terra on our ChatGPT plan (thinking off), reads each open job's full
+listing and picks from fixed lists (`annotationjobs/categories.py`):
+
+- **Field**: the specialist knowledge the worker must bring, from 20 groups based on the US
+  Standard Occupational Classification, including "No specialist field" (generalists, anyone
+  who speaks a language). The worker's knowledge, not the client's industry.
+- **Kind of task**: what the work mainly is, one of 9 (training AI with answers, rating search /
+  ads / content, labeling data, translation and transcription, recording data, paid study, using
+  or testing software, company staff role, other).
+- **Languages**: every language other than English the job requires, plus the variety asked for
+  ("Dutch (Belgium)"). English only when a specific accent is required. The page groups a job
+  under its one non-English language, or "Several languages"; its search box finds each one.
+
+It also quotes the passages behind each answer; the page shows only quotes found word for word
+in the listing. Chosen after testing five models on 60 listings (`experiments/categorize/`):
+Terra agreed with the other models' majority on 26 of 27 fields and 26 of 30 tasks, with every
+quote real. No answer key was made by hand, so this is agreement, not measured accuracy.
+
+```sh
+uv run --no-project --with lm15==1.5.0 python -m annotationjobs.categorize   # sort open jobs not sorted yet
+```
+
+`collect` runs it after fetching (`--no-categorize` to skip). Each distinct listing text is
+asked once (~1 s each with 4 at a time; about an hour for all ~2,650 open jobs, ~$2.50 per
+1,000 jobs at API prices, nothing extra on the plan). Changing `VERSION` in `categories.py`
+sorts every job again. Jobs not sorted yet show as "Not sorted yet".
 
 ## Not covered
 

@@ -30,9 +30,12 @@ Handshake only give "up to" figures, so their real rates are likely lower than s
 
 ![Hourly pay by field](3-hourly-pay-by-field.png)
 
-Medicine pays the most (median $125/hr), then finance, software, law and creative work
-(~$95–100). Language work is the lowest (median $28) and the widest spread. The field is
-guessed from the job title by keywords, so expect some jobs in the wrong row.
+Medicine pays the most (median $130/hr), then law, finance and military work (~$100), with arts,
+maths, life sciences and computing close behind (~$90–95). Jobs that need no specialist field are
+the lowest (median $20, many of them language and data-collection work) and the widest spread;
+translation and linguistics as a trade sits between ($40). The field is the knowledge the worker
+must bring, read from the full listing by a language model (GPT-6.1 Terra, see the main README),
+so a job that fits two fields can land in either.
 
 ## 4. Pay vs experience and degree
 
