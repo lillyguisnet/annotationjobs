@@ -23,6 +23,7 @@ from .collect import all_listings
 from .groups import FIELDS, KIND_NAME, RULES, degree_level, field
 from .logos import logo_paths
 from .places import COUNTRIES, ISO, STATE, normalize_places, places_in
+from .terms import pay_factors
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "data" / "jobs.json"
@@ -36,7 +37,8 @@ DEGREES = ["None mentioned", "Associate's", "Bachelor's", "Master's", "PhD", "MD
 MODES = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On site", "": "Not stated"}
 CONTRACTS = {"contractor": "Contractor (stated)", "contractor?": "Contract (assumed)", "temporary": "Temporary / fixed-term",
              "internship": "Internship", "permanent": "Permanent employee", "": "Not stated"}
-PAY = ["Fixed figure or range", "Varies or only \"up to\"", "No figure, but says how", "Nothing about pay"]
+PAY = ["Fixed figure or range", "Only \"up to\"", "No figure, but says how", "Nothing about pay"]
+DEP_NONE, DEP_UNNAMED = "Not said", "Several factors (not named)"
 UNITS = {"hour": "Hour", "year": "Year (salary)", "month": "Month (salary)", "task": "Task", "session": "Session",
          "project": "Project", "": "Amount, unit not stated", None: "No pay figure"}
 # location rule -> short code the page uses for "open to people in <country>"
@@ -60,7 +62,9 @@ DIMS = [
      list(CONTRACTS.values()), False),
     ("unit", "Paid per", "What the pay figure is for. Salaries are shown per hour at 40 hours a week.",
      list(UNITS.values()), False),
-    ("pay", "How pay is stated", "A fixed figure or range, or one that varies or is only an \"up to\" (likely lower).", PAY, False),
+    ("pay", "How pay is stated", "A fixed figure or range, or only an \"up to\" (the job likely pays less).", PAY, False),
+    ("dep", "What sets the rate", "What the listing says the pay depends on, next to the figure. A range on its own does not say.",
+     None, False),
     ("cur", "Currency", "\"$\" with no currency is taken as US$; other currencies are converted at the day's rate.", CUR, False),
 ]
 
@@ -77,7 +81,19 @@ def years_bucket(j):
 def pay_kind(j):
     if j["pay_max"] is None:
         return PAY[2] if j.get("pay_note") else PAY[3]
-    return PAY[1] if j.get("pay_variable") else PAY[0]
+    return PAY[1] if j["pay_min"] is None else PAY[0]
+
+
+def depends_kind(j):
+    """'Experience, skill level and location': the factors the listing names, in a fixed order."""
+    quote = j.get("pay_depends_on")
+    if not quote:
+        return DEP_NONE
+    names = pay_factors(quote)
+    if not names:
+        return DEP_UNNAMED
+    names = [names[0]] + [n.lower() for n in names[1:]]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def cur_kind(j):
@@ -192,6 +208,7 @@ def build():
             "contract": CONTRACTS.get(j.get("contract_type") or "", "Not stated"),
             "unit": UNITS.get(j.get("pay_unit") if j["pay_max"] is not None else None, j.get("pay_unit")),
             "pay": pay_kind(j),
+            "dep": depends_kind(j),
             "cur": cur_kind(j),
         }
         hourly, piece, how = pay_in_usd(j, fx)
@@ -199,7 +216,7 @@ def build():
             "Pay as written": clip(j.get("pay_text")),
             "Pay read from": j.get("pay_source") or "",
             "Currency": clip(j.get("pay_currency_source")),
-            "Why pay varies": clip(j.get("pay_variable_why")),
+            "Pay depends on": clip(j.get("pay_depends_on")),
             "About pay": clip(j.get("pay_note")),
             "Earnings claim (not used)": clip(j.get("pay_earnings_claim")),
             "Who can apply": clip(j.get("location_evidence")),

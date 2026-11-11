@@ -17,8 +17,8 @@
   const PALETTE = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#ff8ab7", "#a463f2", "#97bbf5", "#9c6b4e",
     "#1d2b53", "#8a8f1c", "#7a1f3d"];
   const RAMP = d3.interpolateRgbBasis(["#f2b134", "#e4572e", "#b8336a", "#5b2a86", "#16324f"]);
-  const NEUTRAL = new Set(["Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated"]);
-  const FILTER_ORDER = ["field", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "cur"];
+  const NEUTRAL = new Set(["Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated", "Not said"]);
+  const FILTER_ORDER = ["field", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "dep", "cur"];
   // pay basis: one at a time, a per-hour and a per-task figure do not belong on the same axis
   const BASES = {
     hour: { label: "Per hour", unit: "/hr", axis: "Top of hourly rate (US$)", title: "Hourly pay", color: "pay",
@@ -211,7 +211,7 @@
 
   // short names for the filter buttons (the popover shows the full name and what it means)
   const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", site: "Site", kind: "Site type", who: "Who can apply",
-    mode: "Work mode", degree: "Degree", years: "Experience", contract: "Job type", unit: "Paid per", pay: "Pay clarity", cur: "Currency" };
+    mode: "Work mode", degree: "Degree", years: "Experience", contract: "Job type", unit: "Paid per", pay: "Pay clarity", dep: "Rate set by", cur: "Currency" };
   const SMALL = matchMedia("(max-width: 720px)");
 
   function buildFilterButtons() {
@@ -234,7 +234,7 @@
     const box = $("#filters");
     for (const id of ["live", "field", "site", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
     // filters about pay sit with the pay switch (the range's unit follows it); on a phone they lead the scrolling filter row
-    const payFilters = ["pay$", "unit", "pay", "cur"].map(mk);
+    const payFilters = ["pay$", "unit", "pay", "dep", "cur"].map(mk);
     const payBox = document.createElement("div");
     payBox.className = "filters pay-filters";
     zone.appendChild(payBox);
@@ -861,7 +861,8 @@
       const t = payText(j);
       const tags = [];
       if (j.pmax != null && j.pmin == null) tags.push(`<span class="tag warn">only "up to"</span>`);
-      else if (val(j, "pay").startsWith("Varies")) tags.push(`<span class="tag warn">varies</span>`);
+      // a range already says pay varies; what it varies with is the news (the quote is in the job's details)
+      if (j.ev["Pay depends on"]) tags.push(`<span class="tag" title="${esc(j.ev["Pay depends on"])}">depends on ${esc(val(j, "dep").toLowerCase())}</span>`);
       if (val(j, "cur").includes("assumed")) tags.push(`<span class="tag">"$" assumed US$</span>`);
       if (val(j, "cur").startsWith("Converted")) tags.push(`<span class="tag">converted</span>`);
       if (j.unit === "year" || j.unit === "month") tags.push(`<span class="tag">salary, 40 h/week</span>`);
@@ -943,7 +944,7 @@
       ["Conversion", ev["Converted"]],
       ["Pay as written", ev["Pay as written"]],
       ["Currency", ev["Currency"]],
-      ["Why pay varies", ev["Why pay varies"]],
+      ["Pay depends on", ev["Pay depends on"]],
       ["About pay", ev["About pay"]],
       ["Earnings claim (not used)", ev["Earnings claim (not used)"]],
       ["Who can apply", whoText(j) + (ev["Who can apply"] ? ` (${ev["Who can apply"]})` : "")],

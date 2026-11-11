@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .common import RAW_ROOT, degrees_in, experience
 from .places import location_info
-from .terms import best_pay, earnings_claim, engagement, pay_mentions, pay_unstated, pay_varies
+from .terms import best_pay, earnings_claim, engagement, pay_depends_on, pay_mentions, pay_unstated
 
 # What each platform says about all its work, used only when a listing itself says nothing.
 SITE_DEFAULT = {
@@ -149,17 +149,14 @@ def derive(r, board):
         r["title"], text + ("\n" + comp if comp else ""), structured, board.get("kind", ""), SITE_DEFAULT.get(r["source"], ""))
     r.update(location_info(r))
     confirm_currency_by_location(r)
-    # variable pay: "up to $125/hr depending on task difficulty", "rates vary by country"
+    # what pay depends on, said next to the figure ("up to $125/hr depending on task difficulty") or, with no
+    # figure, next to what the listing says instead ("rates vary by country"). A range alone says nothing about it.
     pos = [m["pos"] for m in mentions if r["pay_max"] is not None and abs(m["max"] - r["pay_max"]) < 0.01]
     badge = (r.get("pay_text") or "")[:30].lower()
     if badge:
         pos.append(text.lower().find(badge))
-    why = pay_varies(text, pos) if r["pay_max"] is not None else ""
-    if r["pay_max"] is not None and (why or r["pay_min"] is None):
-        r["pay_variable"] = True
-        r["pay_variable_why"] = why or "only a top figure is given (\"up to\")"
-    else:
-        r["pay_variable"], r["pay_variable_why"] = False, ""
+    r["pay_depends_on"] = pay_depends_on(text, pos)
+    r.pop("pay_variable", None), r.pop("pay_variable_why", None)  # replaced by pay_depends_on ("up to" = no pay_min)
     r["pay_earnings_claim"] = earnings_claim(text)
     # years and degrees (degrees from a site badge, e.g. Handshake, are kept)
     r["min_years_experience"], r["experience_text"] = experience(text)

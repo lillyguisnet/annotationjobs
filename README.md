@@ -22,7 +22,8 @@ Standard library only (Python 3.11+). Charts (`data/plots/`, with a short write-
 
 `docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
 job's pay range in US$, grouped and colored by any of site, type of site, field, degree, experience, work
-mode, who can apply, kind of job, what the pay is per, how it is stated and its currency, with filters
+mode, who can apply, kind of job, what the pay is per, how it is stated (a figure or range, or only "up to"),
+what the listing says it depends on, and its currency, with filters
 (including "open to people in <country>") shared by the chart and the table below it. A switch shows one
 pay basis at a time: per hour, per task or project (task, project, session), or jobs with no pay figure.
 The view is kept in the address, so a link reopens it.
@@ -74,8 +75,12 @@ All of this is redone from the stored text, without fetching, by `--reparse`
 - Currency from location: a bare "$" on a job that must be done from the US (or on site in the
   US) is recorded as USD with the reason. For a job limited to another dollar country (Canada,
   Australia, Mexico...) it stays "assumed" with a note that "$" may be the local dollar.
-- Variable pay (`pay_variable`, `pay_variable_why`): only a top figure ("up to"), or the text
-  around the figure says it depends on task, project, level, country... (quoted).
+- What pay depends on (`pay_depends_on`): the words next to the pay figure (or, with no figure, next to
+  what the listing says instead) that say what the rate depends on: "depending on experience and
+  location", "rates vary by country", "based on tasks completed" (quoted). A range on its own says
+  nothing about it, so most ranges have none. The page groups the quote by the factors it names
+  (`FACTORS` in `annotationjobs/terms.py`): experience, skill level, location, kind of work, amount of
+  work. "Up to" pay is a pay figure with no `pay_min`.
 - `pay_earnings_claim`: sentences such as "Many contributors add $100k–$200k a year". Kept as
   a note only: on DataAnnotation it is the same sentence on every role, including roles paying
   at most $40/hr (which would need 5,000 hours a year to reach $200k), so no per-role pay is

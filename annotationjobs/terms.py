@@ -250,30 +250,63 @@ def pay_unstated(text):
     return "", ""
 
 
-# --- pay that varies ------------------------------------------------------------------------
+# --- what pay depends on ----------------------------------------------------------------------
 
-VARY = [re.compile(x, re.I) for x in (  # strongest first
-    r"depend(?:s|ing)? (?:up)?on (?:[^.\n;]|\.(?=\d)){3,80}",
-    r"var(?:y|ies) (?:by|with|based on|depending on|according to|across|per)(?:[^.\n;]|\.(?=\d)){3,80}",
-    r"rates? (?:may )?vary(?:[^.\n;]|\.(?=\d)){0,80}",
-    r"based on (?:the |your )?(?:task|project|level|tier|experience|location|country)(?:[^.\n;]|\.(?=\d)){0,60}",
-    r"commensurate with (?:[^.\n;]|\.(?=\d)){3,60}", r"determined by (?:[^.\n;]|\.(?=\d)){3,60}",
-    r"according to (?:your )?(?:level|tier|experience)(?:[^.\n;]|\.(?=\d)){0,50}", r"median at your tier", r"per hour equivalent")]
+_RUN = r"(?:[^.\n;|]|\.(?=\d))"  # a run of the same sentence ("$7.50" does not end it; "|" starts another field)
+DEPENDS = [re.compile(x.replace("RUN", _RUN), re.I) for x in (  # strongest first
+    r"depend(?:s|ing)? (?:up)?on RUN{3,120}",
+    r"var(?:y|ies) (?:widely )?(?:by|with|based on|depending on|according to|across|per)RUN{3,120}",
+    r"rates? (?:may )?vary(?: widely)?RUN{0,120}",
+    r"based on (?:the |your )?(?:task|project|level|tier|experience|location|country)RUN{0,100}",
+    r"commensurate with RUN{3,100}", r"determined by RUN{3,100}",
+    r"according to (?:your )?(?:level|tier|experience)RUN{0,80}", r"median at your tier")]
+# what the quote says pay depends on; first match wins for a stretch of text ("based on tasks completed" is
+# the amount of work, not the kind)
+FACTORS = [(name, re.compile(rx, re.I)) for name, rx in (
+    ("Amount of work", r"tasks? (?:completed|done|submitted)|based on tasks|\bpace\b|productiv|throughput|volume of"),
+    ("Experience", r"experience|seniority"),
+    ("Skill level", r"skill|qualification|education|expertise|assessment|\blevel\b|\btier\b|proficien|credential"),
+    ("Location", r"location|countr|geograph|region|where you live|\bstate\b"),
+    ("Kind of work", r"task|project|role|specialt|speciali[sz]|profession|difficulty|complexity|domain"),
+)]
 # "Many contributors add $100k–$200k a year": a claim about some contributors, not this role's pay
 EARN_CLAIM = re.compile(r"[^.\n]{0,80}(?:contributors|experts|members|people|users|freelancers|taskers)[^.\n]{0,40}"
                         r"(?:earn|make|add|take home)[^.\n]{0,80}(?:a year|per year|annually|a month|per month)[^.\n]{0,40}", re.I)
 
 
-def pay_varies(text, positions):
-    """Why the pay is variable, from the sentences around the pay figures (or '')."""
+def _tidy(quote, cut):
+    """A quote as shown: one line, no unmatched closing bracket, and cut at a word with '…' when the
+    pattern stopped mid-sentence."""
+    q = re.sub(r"\s+", " ", quote).strip(" .,;:")
+    if cut:
+        q = re.sub(r"[\s,;:(]+\S*$", "", q).rstrip(" ,;:(") + "…"
+    while q.endswith(")") and q.count(")") > q.count("("):
+        q = q[:-1].rstrip(" .,;:")
+    return q
+
+
+def pay_depends_on(text, positions):
+    """What the listing says pay depends on, quoted from the sentences around the pay figures (or '')."""
     text = text or ""
     windows = [text[max(0, p - 80):p + 260] for p in positions if p is not None and p >= 0]
-    for rx in VARY:
+    for rx in DEPENDS:
         for w in windows:
             m = rx.search(w)
             if m:
-                return re.sub(r"\s+", " ", m.group(0)).strip(" .,;")
+                # stopped by the length limit, not by the end of the sentence: the quote goes on
+                cut = m.end() < len(w) and re.match(_RUN, w[m.end()]) is not None and m.end() - m.start() > 40
+                return _tidy(m.group(0), cut)
     return ""
+
+
+def pay_factors(quote):
+    """The factors a pay_depends_on quote names, in FACTORS order, e.g. ['Experience', 'Location']."""
+    q, found = quote or "", set()
+    for name, rx in FACTORS:
+        for m in rx.finditer(q):
+            found.add(name)
+            q = q[:m.start()] + " " * (m.end() - m.start()) + q[m.end():]  # a stretch counts once
+    return [name for name, _ in FACTORS if name in found]
 
 
 def earnings_claim(text):

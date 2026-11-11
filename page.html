@@ -42,7 +42,7 @@ details pre{white-space:pre-wrap;font:12.5px/1.5 system-ui;max-height:420px;over
  <label>Site<select id="site"><option value="">All</option></select></label>
  <label>Paid per<select id="unit"><option value="">Any</option><option value="hour">Hour</option><option value="task">Task</option><option value="year">Year</option><option value="month">Month</option><option value="none">Not stated</option></select></label>
  <label>Currency<select id="cur"><option value="">Any</option><option>USD</option><option>CAD</option><option>EUR</option><option>GBP</option><option value="other">Other</option></select></label>
- <label class="ck"><input type="checkbox" id="fixed">Fixed pay only</label>
+ <label class="ck"><input type="checkbox" id="fixed">Figure or range, not &quot;up to&quot;</label>
  <label>Top pay ≥ (US$/hr equiv.)<input id="minpay" type="number" min="0" step="5" style="width:95px"></label>
  <label>Kind of job<select id="ctype"><option value="">Any</option><option value="contractor">Contractor / freelance (incl. assumed)</option><option value="temporary">Temporary / fixed-term</option><option value="permanent">Permanent employee</option><option value="internship">Internship</option><option value="none">Not stated</option></select></label>
  <label>Years asked ≤<input id="maxyrs" type="number" min="0" style="width:70px" placeholder="any"></label>
@@ -85,7 +85,7 @@ function pay(j) {
   s += ` <span class="cur${j.pay_currency !== "USD" ? " nonusd" : ""}" title="${esc("Currency: " + (j.pay_currency_source || ""))}">${esc(j.pay_currency || "")}${assumed ? "?" : ""}</span>`;
   if (j.pay_unit && j.pay_unit !== "hour" && j.hourly) s += `<div class="mut small">≈ $${Math.round(j.hourly)}/hr</div>`;
   if (j.pay_source && j.pay_source !== "site field") s += `<div class="mut small">${esc(j.pay_source === "text" ? "read from the text" : j.pay_source)}</div>`;
-  if (j.pay_variable) s += `<div class="vary" title="${esc(j.pay_variable_why)}">varies: ${esc(j.pay_variable_why.slice(0, 60))}${j.pay_variable_why.length > 60 ? "…" : ""}</div>`;
+  if (j.pay_depends_on) s += `<div class="vary" title="${esc(j.pay_depends_on)}">depends on: ${esc(j.pay_depends_on.slice(0, 60))}${j.pay_depends_on.length > 60 ? "…" : ""}</div>`;
   if (j.pay_note) s += `<div class="note">${esc(j.pay_note)}</div>`;
   if (j.hours_per_week) s += `<div class="mut small">${j.hours_per_week} h/week</div>`;
   return s;
@@ -112,7 +112,7 @@ function filtered() {
     (!unit || (unit === "none" ? j.pay_max == null : j.pay_unit === unit)) &&
     (!cur || (cur === "other" ? j.pay_currency && !["USD", "CAD", "EUR", "GBP"].includes(j.pay_currency) : j.pay_currency === cur)) &&
     (!ctype || (ctype === "none" ? !j.contract_type : (ctype === "contractor" ? j.contract_type.startsWith("contractor") : j.contract_type === ctype))) &&
-    (isNaN(minpay) || (j.hourly ?? -1) >= minpay) && (!$("fixed").checked || (j.pay_max != null && !j.pay_variable)) &&
+    (isNaN(minpay) || (j.hourly ?? -1) >= minpay) && (!$("fixed").checked || (j.pay_max != null && j.pay_min != null)) &&
     (isNaN(maxyrs) || j.min_years_experience == null || j.min_years_experience <= maxyrs) &&
     (!deg || (j.degrees || "").includes(deg)) &&
     (!mode || (mode === "none" ? !j.work_mode : j.work_mode === mode)) &&
@@ -183,7 +183,7 @@ async function fullText(src, uid) {
       (o.pay_source ? "  (from: " + o.pay_source + "; currency: " + (o.pay_currency_source || "") + ")" : ""),
     o.pay_site ? "Site's own pay field: " + amt([o.pay_site.min, o.pay_site.max, o.pay_site.currency || "", o.pay_site.unit]) : "",
     o.pay_note ? "Check: " + o.pay_note : "",
-    o.pay_variable ? "Pay varies: " + o.pay_variable_why : "",
+    o.pay_depends_on ? "Pay depends on: " + o.pay_depends_on : "",
     o.pay_earnings_claim ? "Earnings claim on the page (about some contributors, not this role's pay): \"" + o.pay_earnings_claim + "\"" : "",
     (o.pay_all || []).length ? "Amounts in the text:\n" + o.pay_all.map(a => "  • " + amt(a) + "   …" + a[4] + "…").join("\n") : "",
     "KIND OF JOB: " + (o.contract_type === "contractor?" ? "contract (assumed)" : (o.contract_type || "not stated")) + (o.contract_evidence ? "  (" + o.contract_evidence + ")" : ""),
