@@ -50,10 +50,11 @@ pays less.
 
 ![Pay clarity](5-pay-clarity-by-site.png)
 
-60% of jobs give a fixed figure or range, 18% only an "up to" figure (likely paying less), 7% say
-how they pay without a number ("per task", "shared later"), 15% say nothing. Mercor, Alignerr and
-G2i always give a figure or range; micro1, Amazon and Centific say the least. A range is counted as
-a range whether or not the listing says what it depends on (experience, location...).
+19% of jobs give one figure (you know the rate), 41% a range (you don't know where in it you will
+land), 18% only an "up to" figure (likely paying less), 7% say how they pay without a number ("per
+task", "shared later"), 15% say nothing. Alignerr and G2i always give a range; RWS and Appen mostly
+give one figure; micro1, Amazon and Centific say the least. A range counts as a range
+whether or not the listing says what it depends on (experience, location...).
 
 ## 6. Who can apply
 

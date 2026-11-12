@@ -71,14 +71,14 @@ def degree_level(degrees):
             else "Bachelor's" if "Bachelor" in d else "Associate's" if "Associate" in d else "none")
 
 
-PAY_CLASSES = [("Fixed figure or range", "#2a9d6f"), ("Only \"up to\"", "#e9b44c"),
+PAY_CLASSES = [("One figure", "#1f7a55"), ("Range", "#7fc8a9"), ("Only \"up to\"", "#e9b44c"),
                ("No figure, but says how (per task, later...)", "#e07a5f"), ("Nothing about pay", "#bbbbbb")]
 
 
 def pay_class(j):
     if j["pay_max"] is not None:
-        return PAY_CLASSES[1][0] if j["pay_min"] is None else PAY_CLASSES[0][0]
-    return PAY_CLASSES[2][0] if j.get("pay_note") else PAY_CLASSES[3][0]
+        return PAY_CLASSES[2][0] if j["pay_min"] is None else PAY_CLASSES[0][0] if j["pay_min"] == j["pay_max"] else PAY_CLASSES[1][0]
+    return PAY_CLASSES[3][0] if j.get("pay_note") else PAY_CLASSES[4][0]
 
 
 RULES = [("only listed places", "Must live in listed places", "#d0662b"), ("anywhere", "Anywhere", "#2a9d6f"),

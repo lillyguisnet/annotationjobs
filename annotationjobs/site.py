@@ -38,7 +38,7 @@ DEGREES = ["None mentioned", "Associate's", "Bachelor's", "Master's", "PhD", "MD
 MODES = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On site", "": "Not stated"}
 CONTRACTS = {"contractor": "Contractor (stated)", "contractor?": "Contract (assumed)", "temporary": "Temporary / fixed-term",
              "internship": "Internship", "permanent": "Permanent employee", "": "Not stated"}
-PAY = ["Fixed figure or range", "Only \"up to\"", "No figure, but says how", "Nothing about pay"]
+PAY = ["One figure", "Range", "Only \"up to\"", "No figure, but says how", "Nothing about pay"]
 DEP_NONE, DEP_UNNAMED = "Not said", "Several factors (not named)"
 UNITS = {"hour": "Hour", "year": "Year (salary)", "month": "Month (salary)", "task": "Task", "session": "Session",
          "project": "Project", "": "Amount, unit not stated", None: "No pay figure"}
@@ -68,7 +68,8 @@ DIMS = [
      list(CONTRACTS.values()), False),
     ("unit", "Paid per", "What the pay figure is for. Salaries are shown per hour at 40 hours a week.",
      list(UNITS.values()), False),
-    ("pay", "How pay is stated", "A fixed figure or range, or only an \"up to\" (the job likely pays less).", PAY, False),
+    ("pay", "How pay is stated", "One figure (you know the rate), a range (you don't know where in it you will be), or only an \"up to\" "
+     "(likely less). A few one-figure listings still say the rate depends on something: see \"What sets the rate\".", PAY, False),
     ("dep", "What sets the rate", "What the listing says the pay depends on, next to the figure. A range on its own does not say.",
      None, False),
     ("cur", "Currency", "\"$\" with no currency is taken as US$; other currencies are converted at the day's rate.", CUR, False),
@@ -86,8 +87,8 @@ def years_bucket(j):
 
 def pay_kind(j):
     if j["pay_max"] is None:
-        return PAY[2] if j.get("pay_note") else PAY[3]
-    return PAY[1] if j["pay_min"] is None else PAY[0]
+        return PAY[3] if j.get("pay_note") else PAY[4]
+    return PAY[2] if j["pay_min"] is None else PAY[0] if j["pay_min"] == j["pay_max"] else PAY[1]
 
 
 def depends_kind(j):

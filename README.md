@@ -23,7 +23,7 @@ with a language model (it needs `lm15` and runs through `uv`, see below). Charts
 
 `docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
 job's pay range in US$, grouped and colored by any of site, type of site, field, kind of task, language, degree, experience, work
-mode, who can apply, kind of job, what the pay is per, how it is stated (a figure or range, or only "up to"),
+mode, who can apply, kind of job, what the pay is per, how it is stated (one figure, a range, or only "up to"),
 what the listing says it depends on, and its currency, with filters
 (including "open to people in <country>") shared by the chart and the table below it. A switch shows one
 pay basis at a time: per hour, per task or project (task, project, session), or jobs with no pay figure.
