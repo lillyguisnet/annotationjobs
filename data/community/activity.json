@@ -1,0 +1,80 @@
+{
+ "Outlier": {
+  "2026-05": {
+   "ordinary": 1365,
+   "mega": 11
+  },
+  "2026-06": {
+   "ordinary": 1413,
+   "mega": 11
+  },
+  "2026-07": {
+   "ordinary": 1115,
+   "mega": 5
+  },
+  "2026-08": {
+   "ordinary": 704,
+   "mega": 0
+  },
+  "2026-09": {
+   "ordinary": 853,
+   "mega": 0
+  },
+  "2026-10": {
+   "ordinary": 1113,
+   "mega": 0
+  }
+ },
+ "DataAnnotation": {
+  "2026-05": {
+   "ordinary": 3131,
+   "mega": 0
+  },
+  "2026-06": {
+   "ordinary": 2668,
+   "mega": 0
+  },
+  "2026-07": {
+   "ordinary": 2088,
+   "mega": 0
+  },
+  "2026-08": {
+   "ordinary": 1477,
+   "mega": 0
+  },
+  "2026-09": {
+   "ordinary": 1618,
+   "mega": 0
+  },
+  "2026-10": {
+   "ordinary": 1710,
+   "mega": 1
+  }
+ },
+ "Mercor": {
+  "2026-05": {
+   "ordinary": 1182,
+   "mega": 0
+  },
+  "2026-06": {
+   "ordinary": 1024,
+   "mega": 0
+  },
+  "2026-07": {
+   "ordinary": 982,
+   "mega": 0
+  },
+  "2026-08": {
+   "ordinary": 1360,
+   "mega": 0
+  },
+  "2026-09": {
+   "ordinary": 1123,
+   "mega": 0
+  },
+  "2026-10": {
+   "ordinary": 1714,
+   "mega": 0
+  }
+ }
+}

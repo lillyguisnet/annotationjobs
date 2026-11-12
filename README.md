@@ -140,6 +140,25 @@ asked once (~1 s each with 4 at a time; about an hour for all ~2,650 open jobs, 
 1,000 jobs at API prices, nothing extra on the plan). Changing `VERSION` in `categories.py`
 sorts every job again. Jobs not sorted yet show as "Not sorted yet".
 
+## What workers say (Reddit, pilot)
+
+`annotationjobs/community.py` reads a random sample of threads from each platform's own subreddits
+(pilot: Outlier, DataAnnotation, Mercor, May–October 2026) through the Arctic Shift archive of Reddit
+(Reddit refuses scripts; Glassdoor, Indeed and Trustpilot block automated reading), sorts each thread
+into 10 topics with good/bad news for workers and a checked quote, and writes `data/community/report.html`.
+Design choices and limits are in the module's docstring and at the end of the report.
+
+```sh
+python3 -m annotationjobs.community list     # every post of the window (hours: the archive is a volunteer service)
+python3 -m annotationjobs.community sample   # draw 20 threads per platform per month, fetch them
+uv run --no-project --with lm15==1.5.0 python -m annotationjobs.community label
+uv run --no-project --with lm15==1.5.0 python -m annotationjobs.community label --model claude-code:claude-opus-5-5 --ids data/community/check-ids.txt
+python3 -m annotationjobs.community report
+```
+
+Thread texts stay on `/mnt/bulk/lilly/annotationjobs/community/` (other people's words, not in git);
+`data/community/` keeps the sample, the labels with short quotes and links, and the report.
+
 ## Not covered
 
 - TELUS Digital AI Community and Turing's own site block automated visits (Turing's Greenhouse
