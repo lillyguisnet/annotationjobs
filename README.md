@@ -151,9 +151,9 @@ Design choices and limits are in the module's docstring and at the end of the re
 
 ```sh
 python3 -m annotationjobs.community list     # every post of the window (hours: the archive is a volunteer service)
-python3 -m annotationjobs.community sample   # draw 20 threads per platform per month, fetch them
+python3 -m annotationjobs.community sample   # draw 5% of each month's threads per platform, fetch them
 uv run --no-project --with lm15==1.5.0 python -m annotationjobs.community label
-uv run --no-project --with lm15==1.5.0 python -m annotationjobs.community label --model claude-code:claude-opus-5-5 --ids data/community/check-ids.txt
+uv run --no-project --with lm15==1.5.0 python -m annotationjobs.community label --model claude-code:claude-opus-5-5 --ids data/community/check-ids.txt  # optional second reader
 python3 -m annotationjobs.community report
 ```
 

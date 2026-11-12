@@ -15,8 +15,8 @@ import json
 import math
 import re
 
-from .community import (LABEL_MODEL, LABEL_VERSION, LABELS, MEGA_COMMENTS, OUT, PER_MONTH, PLATFORMS, SAMPLE,
-                        TOPICS, WINDOW)
+from .community import (LABEL_MODEL, LABEL_VERSION, LABELS, MEGA_COMMENTS, OUT, PLATFORMS, SAMPLE,
+                        SHARE, TOPICS, WINDOW)
 
 COLORS = {"bad": "#d0543f", "mixed": "#e2a93b", "good": "#3f9a5e", "neutral": "#9aa3ad"}
 STANCE_WORD = {"bad": "bad news", "mixed": "mixed", "good": "good news", "neutral": "question / fact only"}
@@ -206,8 +206,8 @@ because one such thread is many people at once.</p><table class=mega>{''.join(me
 <li><b>Source.</b> Each platform's own Reddit forums, {WINDOW[0]} to {WINDOW[1]}, read through the Arctic Shift archive
 of Reddit (Reddit itself blocks scripts). Glassdoor, Indeed and Trustpilot block automated reading and are not included.
 General forums such as r/WorkOnline could not be searched reliably and are not included either.</li>
-<li><b>Sample.</b> Every post of the window was listed, then {PER_MONTH} ordinary threads per platform per month were drawn at
-random, with all their comments. Shares are weighted back to how busy each month was.</li>
+<li><b>Sample.</b> Every post of the window was listed, then {100 * SHARE:.0f}% of each month's threads were drawn at random
+for each platform (so busier months give more threads), with all their comments. Removed posts stay in the sample.</li>
 <li><b>Reading.</b> A language model ({esc(LABEL_MODEL.split(':')[-1])}) read each thread and listed the topics it discusses, whether
 what is said is good or bad news for workers, and a quote. {n_found} of {n_quotes} quotes were found word for word in the
 thread; only those are shown. {n_off} threads were not about the platform and {n_promo} were adverts; both are left out.

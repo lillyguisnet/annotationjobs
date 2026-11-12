@@ -13,7 +13,8 @@ Design (why, not only what):
 - The forums are each platform's own subreddits. Keyword search in big general forums
   (r/WorkOnline, r/beermoney) times out on the archive, so they are not covered.
 - Every post of the window is listed first: monthly activity is then a count, not a guess,
-  and the sample is a true random draw (fixed seed, so it can be redrawn identically).
+  and the sample is a true random draw (fixed seed, so it can be redrawn identically) of 5%
+  of each month's threads, so busier months get more.
 - Recurring threads (venting, weekly/daily threads, megathreads, moderator posts) are a separate stratum. r/outlier_ai removes stand-alone
   complaint posts and sends them to its weekly venting thread; mixing that thread into a
   uniform draw would hide most complaints, counting each of its comments as a thread would
@@ -30,6 +31,7 @@ labels, short checked quotes and links are kept in data/community/.
 import argparse
 import collections
 import datetime as dt
+import hashlib
 import json
 import random
 import re
@@ -49,8 +51,9 @@ PLATFORMS = {  # platform -> its own forums
     "DataAnnotation": ["DataAnnotationTech", "dataannotation"],
     "Mercor": ["mercor_ai", "mercorai_workers", "Mercor_contractors"],
 }
-PER_MONTH = 20  # ordinary threads drawn per platform per month
-MEGA_PER_MONTH = 1  # venting / megathreads drawn per platform per month
+SHARE = 0.05  # share of each month's ordinary threads read, per platform (more in busier months)
+PILOT_PER_MONTH = 20  # the pilot's draw (2026-11-11), kept as the start of the sample: see draw()
+MEGA_PER_MONTH = 1  # recurring / moderator threads read per platform per month
 MEGA_COMMENTS = 80  # comments read from one megathread (a random subset)
 MAX_CHARS = 30000  # thread text given to the model; longer threads lose their last comments
 SEED = 20261111
@@ -160,8 +163,20 @@ def is_mega(p):
 # --- 2. sample and fetch the threads ------------------------------------------------------
 
 def draw():
-    """The sample: PER_MONTH ordinary threads and MEGA_PER_MONTH megathreads per platform and month."""
+    """The sample: SHARE of each month's ordinary threads (at least one) and MEGA_PER_MONTH
+    recurring threads, per platform and month.
+
+    Each month's posts are put in a random order and the first ones are taken. That order starts
+    with the pilot's draw (PILOT_PER_MONTH random threads, same seed and calls as then) and goes
+    on with the other posts in a seeded random order. A random set followed by a random choice
+    among the rest is still a uniformly random sample, and the pilot's threads, already fetched
+    and sorted, are reused.
+    """
     rng = random.Random(SEED)
+
+    def rest_order(post):
+        return hashlib.sha1(f"{SEED}:{post['id']}".encode()).hexdigest()
+
     rows, activity = [], {}
     for platform, subs in PLATFORMS.items():
         by_month = collections.defaultdict(lambda: {"ordinary": [], "mega": []})
@@ -171,9 +186,13 @@ def draw():
                 by_month[month_of(p["created_utc"])]["mega" if is_mega(p) else "ordinary"].append(p)
         activity[platform] = {m: {k: len(v) for k, v in g.items()} for m, g in sorted(by_month.items())}
         for m, g in sorted(by_month.items()):
-            for stratum, n in (("ordinary", PER_MONTH), ("mega", MEGA_PER_MONTH)):
+            for stratum, n_pilot in (("ordinary", PILOT_PER_MONTH), ("mega", MEGA_PER_MONTH)):
                 pool = sorted(g[stratum], key=lambda p: p["id"])
-                for p in rng.sample(pool, min(n, len(pool))):
+                first = rng.sample(pool, min(n_pilot, len(pool)))
+                ids = {p["id"] for p in first}
+                order = first + sorted((p for p in pool if p["id"] not in ids), key=rest_order)
+                n = max(1, round(SHARE * len(pool))) if stratum == "ordinary" else MEGA_PER_MONTH
+                for p in order[:n]:
                     rows.append({"platform": platform, "month": m, "stratum": stratum, "pool": len(pool),
                                  "id": p["id"], "subreddit": p["subreddit"], "title": p["title"]})
     return rows, activity
