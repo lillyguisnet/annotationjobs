@@ -481,11 +481,15 @@
     hideTip();
     const xi = DI[S.x], xd = DIMS[xi];
     const B = BASES[S.basis];
-    const pts = filtered.filter((j) => yv(j) != null);
-    const col = colors(S.color ? JOBS.filter((j) => yv(j) != null && passes(j, S.color)) : pts);
+    const bars = S.basis === "none"; // no pay to plot: count the jobs, as bars stacked by the color grouping
+    const drawn = (j) => bars || yv(j) != null;
+    const pts = filtered.filter(drawn);
+    const col = colors(S.color ? JOBS.filter((j) => drawn(j) && passes(j, S.color)) : pts);
+    $("#scale").closest(".ctl").hidden = bars;
+    $("#color-label").textContent = bars ? "Color bars by" : "Color dots by";
 
     const med = d3.median(pts, yv);
-    $("#chart-title").textContent = S.basis === "none" ? B.title : `${B.title} by ${xd.label.toLowerCase()}`;
+    $("#chart-title").textContent = `${B.title} by ${xd.label.toLowerCase()}`;
     // jobs matching the filters but under another pay basis: say so, with a link (e.g. a site whose jobs state no pay)
     const elsewhere = { hour: 0, piece: 0, none: 0 };
     const narrowed = S.q || S.live || Object.keys(S.f).length;
@@ -494,7 +498,8 @@
       .map(([k, n]) => `<button type="button" class="linkbtn" data-basis="${k}">${fmtInt(n)} under \u201c${esc(BASES[k].label)}\u201d</button>`);
     const alsoText = also.length ? ` <span class="also">Also matching: ${also.join(", ")}.</span>` : "";
     $("#chart-sub").innerHTML = (S.basis === "none"
-      ? `<b>${fmtInt(filtered.length)}</b> jobs match your filters but give no pay figure that could be read. They are listed in the table, with what each listing says about pay.`
+      ? (filtered.length ? `Number of jobs whose listing gives no pay figure; the table shows what each says about pay instead.<br>` +
+        `<b>${fmtInt(filtered.length)}</b> jobs match your filters.` : `No job matches these filters.`)
       : pts.length
         ? `${B.sub}<br><b>${fmtInt(pts.length)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>).`
         : `No job matches these filters.`) + alsoText;
@@ -513,6 +518,7 @@
     const logScale = S.scale === "log";
     const tf = logScale ? Math.log : (v) => v;
     const groups = [...by].map(([k, js]) => {
+      if (bars) return { k, label: xd.values[k], js, n: js.length, med: js.length };
       const v = js.map(yv).sort((a, b) => a - b);
       const g = { k, label: xd.values[k], js, v, n: v.length,
         q1: d3.quantileSorted(v, 0.25), med: d3.quantileSorted(v, 0.5), q3: d3.quantileSorted(v, 0.75) };
@@ -521,7 +527,8 @@
       g.hi = [...v].reverse().find((x) => tf(x) <= tf(g.q3) + 1.5 * iqr);
       return g;
     });
-    const mode = S.sort === "auto" ? (xd.ordinal ? "natural" : "median") : S.sort;
+    let mode = S.sort === "auto" ? (xd.ordinal ? "natural" : "median") : S.sort;
+    if (bars && mode === "median") mode = "count"; // bars have no median: tallest first
     groups.sort(mode === "natural" ? (a, b) => a.k - b.k
       : mode === "count" ? (a, b) => b.n - a.n || b.med - a.med
       : (a, b) => (b.n >= MIN_BOX) - (a.n >= MIN_BOX) || b.med - a.med || b.n - a.n);
@@ -555,72 +562,16 @@
     if (!pts.length) {
       svg.attr("height", 120).attr("viewBox", `0 0 ${width} 120`);
       svg.append("text").attr("class", "empty").attr("x", width / 2).attr("y", 60).attr("text-anchor", "middle")
-        .text(S.basis === "none" ? "Nothing to plot: these jobs give no pay figure. See the table below."
-          : also.length ? "No job here: see \u201cAlso matching\u201d above." : "No job matches these filters.");
+        .text(also.length ? "No job here: see \u201cAlso matching\u201d above." : "No job matches these filters.");
       chartState = null;
       return;
     }
 
-    const [lo, hi] = d3.extent(pts, yv);
-    const y = logScale
-      ? d3.scaleLog().domain([Math.max(lo / 1.35, 0.01), hi * 1.35]).range([M.t + plotH, M.t])
-      : d3.scaleLinear().domain([0, hi * 1.05]).nice().range([M.t + plotH, M.t]);
-    let ticks;
-    if (logScale) {
-      const [a, b] = y.domain();
-      ticks = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter((t) => t >= a && t <= b);
-      if (ticks.length < 4) ticks = [1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000].filter((t) => t >= a && t <= b);
-    } else ticks = y.ticks(8);
-
-    const gGrid = svg.append("g").attr("class", "grid");
-    gGrid.selectAll("line").data(ticks).join("line")
-      .attr("x1", M.l).attr("x2", width - M.r).attr("y1", (t) => y(t)).attr("y2", (t) => y(t));
-    const gY = svg.append("g").attr("class", "axis");
-    gY.selectAll("text").data(ticks).join("text")
-      .attr("x", M.l - 8).attr("y", (t) => y(t)).attr("dy", "0.32em").attr("text-anchor", "end").text((t) => money(t));
-    svg.append("text").attr("class", "ylab").attr("transform", `translate(12,${M.t + plotH / 2}) rotate(-90)`)
-      .attr("text-anchor", "middle").text(B.axis);
-
-    // median of everything shown
-    svg.append("line").attr("x1", M.l).attr("x2", width - M.r).attr("y1", y(med)).attr("y2", y(med))
-      .attr("stroke", "#94a3b8").attr("stroke-dasharray", "4 4");
-    const medLabel = () => svg.append("text").attr("x", width - M.r).attr("y", y(med) - 5).attr("text-anchor", "end")
-      .attr("fill", "#475467").attr("font-size", 11.5).attr("paint-order", "stroke").attr("stroke", "#fff")
-      .attr("stroke-width", 4).attr("stroke-linejoin", "round").text(`median of all shown ${money(med)}`);
-
     const cx = (i) => M.l + band * (i + 0.5);
-    const boxW = Math.min(band * 0.62, 84);
-    const colored = !!S.color;
-    const gBox = svg.append("g"), gDot = svg.append("g"), gMed = svg.append("g");
-    const nodes = [];
-    groups.forEach((g, i) => {
-      const x = cx(i);
-      g.x = x;
-      if (g.n >= MIN_BOX) {
-        gBox.append("line").attr("x1", x).attr("x2", x).attr("y1", y(g.lo)).attr("y2", y(g.hi)).attr("stroke", "#a3adbb");
-        for (const w of [g.lo, g.hi]) {
-          gBox.append("line").attr("x1", x - boxW * 0.18).attr("x2", x + boxW * 0.18).attr("y1", y(w)).attr("y2", y(w)).attr("stroke", "#a3adbb");
-        }
-        gBox.append("rect").attr("x", x - boxW / 2).attr("width", boxW).attr("y", y(g.q3)).attr("height", Math.max(1, y(g.q1) - y(g.q3)))
-          .attr("rx", 3).attr("fill", colored ? "#eef1f5" : "#e3ebfd").attr("stroke", colored ? "#8a94a6" : "#7d9ce8");
-        gMed.append("line").attr("x1", x - boxW / 2).attr("x2", x + boxW / 2).attr("y1", y(g.med)).attr("y2", y(g.med))
-          .attr("stroke", "#fff").attr("stroke-width", 5).attr("stroke-linecap", "round");
-        gMed.append("line").attr("x1", x - boxW / 2).attr("x2", x + boxW / 2).attr("y1", y(g.med)).attr("y2", y(g.med))
-          .attr("stroke", "#0f172a").attr("stroke-width", 2.5).attr("stroke-linecap", "round");
-      }
-      const spread = Math.min(band * 0.72, Math.max(boxW, 30 + Math.sqrt(g.n) * 4)); // big groups get room
-      for (const j of g.js) nodes.push({ j, g, px: x + jitter(j.id) * spread * 0.48, py: y(yv(j)) });
-    });
-    // rarer colors drawn last so they are not buried
-    if (S.color) {
-      const ci = DI[S.color], freq = new Map(col.items.map((it) => [it.k, it.n]));
-      nodes.sort((a, b) => (freq.get(b.j.c[ci]) || 0) - (freq.get(a.j.c[ci]) || 0));
-    }
-    const r = pts.length > 1200 ? 2.6 : pts.length > 400 ? 3 : 3.6;
-    const dots = gDot.selectAll("circle").data(nodes).join("circle")
-      .attr("cx", (d) => d.px).attr("cy", (d) => d.py).attr("fill", (d) => col.of(d.j));
+    groups.forEach((g, i) => { g.x = cx(i); });
 
     // x labels (click: show only this group), with the site's logo before its name
+    const drawXLabels = () => {
     const gX = svg.append("g");
     if (lw) svg.append("defs").append("clipPath").attr("id", "logo-clip").attr("clipPathUnits", "objectBoundingBox")
       .append("rect").attr("width", 1).attr("height", 1).attr("rx", 0.2);
@@ -651,13 +602,74 @@
         }
         t.append("text").attr("class", "n").attr("text-anchor", "middle").attr("y", nLines * 14.5 + 2).attr("dy", "0.32em").text(`n=${g.n}`);
       }
-      t.on("click", () => {
-        const cur = S.f[S.x];
-        setFilter(S.x, cur && cur.size === 1 && cur.has(g.k) ? null : new Set([g.k]));
-        S.limit = PAGE;
-        update();
-      });
+      t.on("click", () => showOnlyGroup(g.k));
     });
+    };
+
+    if (bars) {
+      drawBars({ svg, groups, col, M, width, plotH, band, B });
+      drawXLabels();
+      return;
+    }
+
+    const [lo, hi] = d3.extent(pts, yv);
+    const y = logScale
+      ? d3.scaleLog().domain([Math.max(lo / 1.35, 0.01), hi * 1.35]).range([M.t + plotH, M.t])
+      : d3.scaleLinear().domain([0, hi * 1.05]).nice().range([M.t + plotH, M.t]);
+    let ticks;
+    if (logScale) {
+      const [a, b] = y.domain();
+      ticks = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter((t) => t >= a && t <= b);
+      if (ticks.length < 4) ticks = [1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000].filter((t) => t >= a && t <= b);
+    } else ticks = y.ticks(8);
+
+    const gGrid = svg.append("g").attr("class", "grid");
+    gGrid.selectAll("line").data(ticks).join("line")
+      .attr("x1", M.l).attr("x2", width - M.r).attr("y1", (t) => y(t)).attr("y2", (t) => y(t));
+    const gY = svg.append("g").attr("class", "axis");
+    gY.selectAll("text").data(ticks).join("text")
+      .attr("x", M.l - 8).attr("y", (t) => y(t)).attr("dy", "0.32em").attr("text-anchor", "end").text((t) => money(t));
+    svg.append("text").attr("class", "ylab").attr("transform", `translate(12,${M.t + plotH / 2}) rotate(-90)`)
+      .attr("text-anchor", "middle").text(B.axis);
+
+    // median of everything shown
+    svg.append("line").attr("x1", M.l).attr("x2", width - M.r).attr("y1", y(med)).attr("y2", y(med))
+      .attr("stroke", "#94a3b8").attr("stroke-dasharray", "4 4");
+    const medLabel = () => svg.append("text").attr("x", width - M.r).attr("y", y(med) - 5).attr("text-anchor", "end")
+      .attr("fill", "#475467").attr("font-size", 11.5).attr("paint-order", "stroke").attr("stroke", "#fff")
+      .attr("stroke-width", 4).attr("stroke-linejoin", "round").text(`median of all shown ${money(med)}`);
+
+    const boxW = Math.min(band * 0.62, 84);
+    const colored = !!S.color;
+    const gBox = svg.append("g"), gDot = svg.append("g"), gMed = svg.append("g");
+    const nodes = [];
+    groups.forEach((g) => {
+      const x = g.x;
+      if (g.n >= MIN_BOX) {
+        gBox.append("line").attr("x1", x).attr("x2", x).attr("y1", y(g.lo)).attr("y2", y(g.hi)).attr("stroke", "#a3adbb");
+        for (const w of [g.lo, g.hi]) {
+          gBox.append("line").attr("x1", x - boxW * 0.18).attr("x2", x + boxW * 0.18).attr("y1", y(w)).attr("y2", y(w)).attr("stroke", "#a3adbb");
+        }
+        gBox.append("rect").attr("x", x - boxW / 2).attr("width", boxW).attr("y", y(g.q3)).attr("height", Math.max(1, y(g.q1) - y(g.q3)))
+          .attr("rx", 3).attr("fill", colored ? "#eef1f5" : "#e3ebfd").attr("stroke", colored ? "#8a94a6" : "#7d9ce8");
+        gMed.append("line").attr("x1", x - boxW / 2).attr("x2", x + boxW / 2).attr("y1", y(g.med)).attr("y2", y(g.med))
+          .attr("stroke", "#fff").attr("stroke-width", 5).attr("stroke-linecap", "round");
+        gMed.append("line").attr("x1", x - boxW / 2).attr("x2", x + boxW / 2).attr("y1", y(g.med)).attr("y2", y(g.med))
+          .attr("stroke", "#0f172a").attr("stroke-width", 2.5).attr("stroke-linecap", "round");
+      }
+      const spread = Math.min(band * 0.72, Math.max(boxW, 30 + Math.sqrt(g.n) * 4)); // big groups get room
+      for (const j of g.js) nodes.push({ j, g, px: x + jitter(j.id) * spread * 0.48, py: y(yv(j)) });
+    });
+    // rarer colors drawn last so they are not buried
+    if (S.color) {
+      const ci = DI[S.color], freq = new Map(col.items.map((it) => [it.k, it.n]));
+      nodes.sort((a, b) => (freq.get(b.j.c[ci]) || 0) - (freq.get(a.j.c[ci]) || 0));
+    }
+    const r = pts.length > 1200 ? 2.6 : pts.length > 400 ? 3 : 3.6;
+    const dots = gDot.selectAll("circle").data(nodes).join("circle")
+      .attr("cx", (d) => d.px).attr("cy", (d) => d.py).attr("fill", (d) => col.of(d.j));
+
+    drawXLabels();
 
     // hover + click, nearest dot within reach, else the group under the pointer
     const hover = svg.append("circle").attr("r", r + 3).attr("fill", "none").attr("stroke", "#0f172a").attr("stroke-width", 1.5)
@@ -713,11 +725,77 @@
     drawSelection();
   }
 
-  // highlighted values pop (bigger, opaque, on top), the rest fade; `preview` is a legend hover
+  function showOnlyGroup(k) {
+    const cur = S.f[S.x];
+    setFilter(S.x, cur && cur.size === 1 && cur.has(k) ? null : new Set([k]));
+    S.limit = PAGE;
+    update();
+  }
+
+  // jobs with no pay figure: number of jobs per group, the bar split by the color grouping (largest value at the bottom)
+  function drawBars({ svg, groups, col, M, width, plotH, band, B }) {
+    const ci = col.ci, order = col.items.map((it) => it.k); // legend order, so the stack reads like the legend
+    for (const g of groups) {
+      const c = new Map();
+      for (const j of g.js) { const k = S.color ? j.c[ci] : -1; c.set(k, (c.get(k) || 0) + 1); }
+      const keys = S.color ? order.filter((k) => c.has(k)) : [-1];
+      let base = 0;
+      g.segs = keys.map((k) => { const s = { g, k, n: c.get(k), y0: base }; base += s.n; return s; });
+    }
+    const y = d3.scaleLinear().domain([0, d3.max(groups, (g) => g.n) * 1.08]).nice().range([M.t + plotH, M.t]);
+    const ticks = y.ticks(6).filter(Number.isInteger);
+    svg.append("g").attr("class", "grid").selectAll("line").data(ticks).join("line")
+      .attr("x1", M.l).attr("x2", width - M.r).attr("y1", (t) => y(t)).attr("y2", (t) => y(t));
+    svg.append("g").attr("class", "axis").selectAll("text").data(ticks).join("text")
+      .attr("x", M.l - 8).attr("y", (t) => y(t)).attr("dy", "0.32em").attr("text-anchor", "end").text((t) => fmtInt(t));
+    svg.append("text").attr("class", "ylab").attr("transform", `translate(12,${M.t + plotH / 2}) rotate(-90)`)
+      .attr("text-anchor", "middle").text("Number of jobs");
+    const barW = Math.min(band * 0.66, 72);
+    const color = (k) => (S.color ? col.items.find((it) => it.k === k)?.color || OTHER : "#9db4ea");
+    const all = groups.flatMap((g) => g.segs);
+    const segs = svg.append("g").selectAll("rect").data(all).join("rect")
+      .attr("class", "seg-bar")
+      .attr("x", (d) => d.g.x - barW / 2).attr("width", barW)
+      .attr("y", (d) => y(d.y0 + d.n)).attr("height", (d) => Math.max(0, y(d.y0) - y(d.y0 + d.n)))
+      .attr("fill", (d) => color(d.k)).attr("stroke", "#fff").attr("stroke-width", 1).style("cursor", "pointer");
+    svg.append("g").selectAll("text").data(groups).join("text") // total on top of each bar
+      .attr("class", "bar-total").attr("x", (g) => g.x).attr("y", (g) => y(g.n) - 6).attr("text-anchor", "middle").text((g) => fmtInt(g.n));
+    const tipFor = (d, touch) => {
+      const g = d.g, share = Math.round((d.n / g.n) * 100);
+      const rows = [["Jobs in this group", fmtInt(g.n)]];
+      if (S.color) rows.push([DIMS[ci].values[d.k], `${fmtInt(d.n)} (${share}%)`]);
+      return `<b>${esc(g.label)}</b>` +
+        (S.color ? `<div class="big"><span class="sw" style="background:${color(d.k)}"></span>${fmtInt(d.n)} jobs</div>` : "") +
+        `<table>${rows.map(([a, b]) => `<tr><td class="muted">${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</table>` +
+        `<div class="muted" style="margin-top:6px">${touch ? "Tap again" : "Click"} to list only this group in the table</div>`;
+    };
+    let lastType = "mouse", tapped = null;
+    segs.on("pointerdown", (ev) => { lastType = ev.pointerType || "mouse"; })
+      .on("pointermove", (ev, d) => { if (lastType === "mouse" || ev.pointerType === "mouse") showTip(ev, tipFor(d)); })
+      .on("pointerleave", (ev) => { if (ev.pointerType === "mouse") hideTip(); })
+      .on("click", (ev, d) => {
+        if (lastType !== "mouse" && tapped !== d) { tapped = d; showTip(ev, tipFor(d, true)); return; } // touch: first tap explains
+        tapped = null;
+        hideTip();
+        showOnlyGroup(d.g.k);
+      });
+    chartState = { segs, ci, colored: !!S.color, nodes: [] };
+    styleDots();
+  }
+
+  // highlighted values pop (dots: bigger, opaque, on top; bars: full color), the rest fade; `preview` is a legend hover
   function styleDots(preview) {
     if (!chartState) return;
-    const { dots, r, colored, ci } = chartState;
     const H = preview || S.hl;
+    if (chartState.segs) {
+      const { segs, colored } = chartState;
+      const on = colored && H.size > 0;
+      segs.attr("fill-opacity", (d) => (!on || H.has(d.k) ? 1 : 0.18))
+        .attr("stroke", (d) => (on && H.has(d.k) ? "#0f172a" : "#fff")).attr("stroke-width", (d) => (on && H.has(d.k) ? 1.2 : 1));
+      if (on) segs.filter((d) => H.has(d.k)).raise();
+      return;
+    }
+    const { dots, r, colored, ci } = chartState;
     const lit = (d) => H.has(d.j.c[ci]);
     if (!colored || !H.size) {
       dots.attr("r", r).attr("fill-opacity", colored ? 0.8 : 0.5).attr("stroke", "#fff").attr("stroke-width", 0.5).attr("stroke-opacity", 0.8);
@@ -731,7 +809,7 @@
   }
 
   function drawSelection() {
-    if (!chartState) return;
+    if (!chartState || !chartState.selRing) return;
     const d = chartState.nodes.find((n) => n.j.id === S.sel);
     chartState.selRing.style("display", d ? null : "none");
     if (d) chartState.selRing.attr("cx", d.px).attr("cy", d.py).raise();
