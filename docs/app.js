@@ -35,6 +35,11 @@
   const DEFAULTS = { basis: "hour", x: "field", color: "pay", sort: "auto", scale: "log" };
 
   let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE, LOGOS;
+  // POINTS: what the chart can draw. Each job is one point at the top of its pay; a range also has a second point at its
+  // bottom ("Range (min)" under "How pay is stated"), which inherits everything else from its job. The table lists jobs.
+  let POINTS, OFF;
+  const jobOf = (p) => p.job || p;
+  const jobsOf = (pts) => { const seen = new Set(); return pts.map(jobOf).filter((j) => !seen.has(j) && seen.add(j)); };
   const LOGO = 16, LOGO_GAP = 5; // logo size and the space after it, in px
   // small logo of a site, shown before its name (decorative: the name follows, so no alt text)
   const logoSrc = (key, value) => (key === "site" && LOGOS[value]) || null;
@@ -43,7 +48,8 @@
     return src ? `<img class="logo" src="${esc(src)}" alt="" width="${LOGO}" height="${LOGO}" decoding="async" onerror="this.remove()">` : "";
   };
   const PAGE = 10; // table rows shown at first, and added by "Show more"
-  let filtered = [];
+  let filtered = []; // jobs with at least one point passing the filters
+  let points = [];
   let tableRows = [];
   const S = {
     ...DEFAULTS, f: {}, q: "", live: "", unclear: true, min: null, max: null,
@@ -66,6 +72,17 @@
     FXDATE = data.fx && data.fx.date;
     LOGOS = data.logos || {};
     for (const j of JOBS) j.text = [j.t, j.co, j.s, ...j.loc, ...j.pl, ...(j.lg || [])].join(" ").toLowerCase();
+    // values a filter leaves out until ticked (the bottom of ranges): the default view shows each job once
+    OFF = Object.fromEntries(DIMS.filter((d) => d.off).map((d) => [d.key, new Set(d.off.map((v) => d.values.indexOf(v)))]));
+    const pi = DI.pay, minK = DIMS[pi].values.indexOf("Range (min)");
+    POINTS = JOBS.slice();
+    for (const j of JOBS) {
+      if (j.hl == null && j.ptl == null) continue;
+      const b = Object.create(j);
+      Object.assign(b, { job: j, bottom: true, h: j.hl ?? null, pt: j.ptl ?? null, c: j.c.slice() });
+      b.c[pi] = minK;
+      POINTS.push(b);
+    }
     const cc = new Map();
     for (const j of JOBS) if (j.w !== "except") for (const p of j.pl) cc.set(p, (cc.get(p) || 0) + 1);
     COUNTRIES = [...cc].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([c]) => c);
@@ -118,9 +135,9 @@
 
   function passes(j, except) {
     if (except !== "basis" && basisOf(j) !== S.basis) return false;
-    for (const k in S.f) {
+    for (const k of filterKeys()) {
       if (k === except) continue;
-      if (!S.f[k].has(j.c[DI[k]])) return false;
+      if (!fset(k).has(j.c[DI[k]])) return false;
     }
     if (S.q) for (const w of S.q.toLowerCase().split(/\s+/)) if (w && !j.text.includes(w)) return false;
     if (S.live && except !== "live" && !openTo(j, S.live)) return false;
@@ -131,8 +148,16 @@
     return true;
   }
 
+  // the values a dimension's filter keeps: the reader's choice, else the default (all but the OFF ones), else none (= all)
+  const fset = (k) => S.f[k] || (OFF[k] && defaultSet(k));
+  const filterKeys = () => [...Object.keys(S.f), ...Object.keys(OFF).filter((k) => !S.f[k])];
+  const allValues = (k) => new Set(DIMS[DI[k]].values.map((_, i) => i));
+  const defaultSet = (k) => new Set([...allValues(k)].filter((i) => !OFF[k]?.has(i)));
+  const jobsPassing = (except) => jobsOf(POINTS.filter((p) => passes(p, except)));
+
   function setFilter(key, set) {
-    if (!set || set.size === 0 || set.size === DIMS[DI[key]].values.length) delete S.f[key];
+    const def = defaultSet(key);
+    if (!set || set.size === 0 || (set.size === def.size && [...set].every((i) => def.has(i)))) delete S.f[key];
     else S.f[key] = set;
   }
 
@@ -282,7 +307,7 @@
 
   function refreshBasis() {
     const n = { hour: 0, piece: 0, none: 0 };
-    for (const j of JOBS) if (passes(j, "basis")) n[basisOf(j)]++;
+    for (const j of jobsPassing("basis")) n[basisOf(j)]++;
     for (const b of document.querySelectorAll("#basis button")) {
       b.classList.toggle("on", b.dataset.v === S.basis);
       b.setAttribute("aria-checked", b.dataset.v === S.basis);
@@ -328,9 +353,10 @@
     if (id === "live") return fillLive(pop);
     if (id === "pay$") return fillPay(pop);
     const d = DIMS[DI[id]], i = DI[id];
-    const counts = new Array(d.values.length).fill(0);
-    for (const j of JOBS) if (passes(j, id)) counts[j.c[i]]++;
-    const set = S.f[id];
+    const ids = d.values.map(() => new Set()); // jobs, not points: a range's two dots share every value but one
+    for (const p of POINTS) if (passes(p, id)) ids[p.c[i]].add(jobOf(p).id);
+    const counts = ids.map((s) => s.size);
+    const set = fset(id);
     const search = pop.querySelector(".pop-search")?.value || "";
     pop.innerHTML = `<div class="pop-head"><b>${esc(d.label)}</b><p>${esc(d.help)}</p></div>` +
       (d.values.length > 12 ? `<div class="pop-body" style="padding-bottom:0"><input type="search" class="pop-search" placeholder="Find…" value="${esc(search)}"></div>` : "") +
@@ -342,9 +368,10 @@
           <span class="n">${fmtInt(counts[k])}</span>
         </label>`).join("") + `</div>
       <div class="pop-foot"><button type="button" class="linkbtn" data-all>Select all</button>
+        ${S.f[id] && OFF[id] ? `<button type="button" class="linkbtn" data-default>Default</button>` : ""}
         <span class="muted" style="font-size:12px">Numbers: jobs matching your other filters</span></div>`;
     pop.querySelectorAll("input[type=checkbox]").forEach((cb) => cb.onchange = () => {
-      const cur = S.f[id] ? new Set(S.f[id]) : new Set(d.values.map((_, k) => k));
+      const cur = new Set(fset(id) || allValues(id));
       cb.checked ? cur.add(+cb.dataset.k) : cur.delete(+cb.dataset.k);
       setFilter(id, cur);
       S.limit = PAGE;
@@ -355,7 +382,9 @@
       setFilter(id, new Set([+b.dataset.only]));
       update();
     });
-    pop.querySelector("[data-all]").onclick = () => { setFilter(id, null); update(); };
+    pop.querySelector("[data-all]").onclick = () => { setFilter(id, allValues(id)); update(); };
+    const dflt = pop.querySelector("[data-default]");
+    if (dflt) dflt.onclick = () => { setFilter(id, null); update(); };
     const s = pop.querySelector(".pop-search");
     if (s) {
       s.oninput = () => pop.querySelectorAll(".pop-row").forEach((r) => {
@@ -365,7 +394,7 @@
   }
 
   function fillLive(pop) {
-    const base = JOBS.filter((j) => passes(j, "live"));
+    const base = jobsPassing("live");
     const unclear = base.filter((j) => (j.w === "" || j.w === "listed" || (j.w === "onsite" && !j.pl.length)) && !(S.live && j.pl.includes(S.live))).length;
     const counts = new Map(COUNTRIES.map((c) => [c, 0]));
     for (const j of base) if (j.w !== "except") for (const p of j.pl) counts.set(p, counts.get(p) + 1);
@@ -387,7 +416,7 @@
   function fillPay(pop) {
     if (pop.querySelector("#pmin")) return; // keep focus while typing
     const u = S.basis === "hour" ? "$/hr" : "$ per piece";
-    pop.innerHTML = `<div class="pop-head"><b>Pay range</b><p>${S.basis === "hour" ? "Top of the hourly rate" : "Top of the pay per task, project or session"}, in US$.</p></div>
+    pop.innerHTML = `<div class="pop-head"><b>Pay range</b><p>${S.basis === "hour" ? "Top of the hourly rate" : "Top of the pay per task, project or session"}, in US$ (the bottom too, for ranges shown at both ends).</p></div>
       <div class="pop-body"><div class="row2">
         <label>At least (${u})<input type="number" id="pmin" min="0" step="1" inputmode="decimal" value="${S.min ?? ""}" placeholder="any"></label>
         <label>At most (${u})<input type="number" id="pmax" min="0" step="1" inputmode="decimal" value="${S.max ?? ""}" placeholder="any"></label>
@@ -412,10 +441,11 @@
 
   function filterText(k) { // short description of a dimension filter, or "" when it is off
     if (!S.f[k]) return "";
-    const d = DIMS[DI[k]], on = [...S.f[k]].sort((a, b) => a - b);
-    const off = d.values.filter((_, i) => !S.f[k].has(i));
+    const d = DIMS[DI[k]], set = S.f[k], def = defaultSet(k), on = [...set].sort((a, b) => a - b);
+    const off = d.values.filter((_, i) => def.has(i) && !set.has(i)), added = d.values.filter((_, i) => !def.has(i) && set.has(i));
     if (on.length === 1) return d.values[on[0]];
-    if (off.length === 1) return "not " + off[0];
+    if (off.length === 1 && !added.length) return "not " + off[0];
+    if (added.length && !off.length) return "+ " + added.join(", ");
     return "";
   }
 
@@ -435,7 +465,8 @@
   // ---------------------------------------------------------------- update
 
   function update() {
-    filtered = JOBS.filter((j) => passes(j));
+    points = POINTS.filter((p) => passes(p));
+    filtered = jobsOf(points);
     for (const b of document.querySelectorAll("#scale button")) b.classList.toggle("on", b.dataset.v === S.scale);
     refreshBasis();
     refreshFilterButtons();
@@ -454,9 +485,10 @@
     // Only the values still shown get a color, so hiding one hands its color to the next largest.
     if (!S.color) return { of: () => ACCENT, items: [] };
     const ci = DI[S.color], d = DIMS[ci];
-    const n = new Map();
-    for (const j of ptsAll) n.set(j.c[ci], (n.get(j.c[ci]) || 0) + 1);
-    const on = (k) => !S.f[S.color] || S.f[S.color].has(k);
+    const ids = new Map(); // value -> jobs (a range's two dots count once)
+    for (const p of ptsAll) { if (!ids.has(p.c[ci])) ids.set(p.c[ci], new Set()); ids.get(p.c[ci]).add(jobOf(p).id); }
+    const n = new Map([...ids].map(([k, s]) => [k, s.size]));
+    const on = (k) => !fset(S.color) || fset(S.color).has(k);
     const map = new Map();
     const shown = [...n.keys()].filter((k) => on(k) && !NEUTRAL.has(d.values[k]));
     if (d.ordinal) {
@@ -483,8 +515,14 @@
     const B = BASES[S.basis];
     const bars = S.basis === "none"; // no pay to plot: count the jobs, as bars stacked by the color grouping
     const drawn = (j) => bars || yv(j) != null;
-    const pts = filtered.filter(drawn);
-    const col = colors(S.color ? JOBS.filter((j) => drawn(j) && passes(j, S.color)) : pts);
+    const pts = points.filter(drawn);
+    const col = colors(S.color ? POINTS.filter((p) => drawn(p) && passes(p, S.color)) : pts);
+    const nJobs = jobsOf(pts).length, both = pts.length > nJobs; // both ends of some ranges are drawn
+    // which end of the pay the dots are: "top" (the default), "bottom" (only range bottoms), or "both"
+    const ends = pts.some((p) => p.bottom) ? (pts.some((p) => !p.bottom) ? "both" : "bottom") : "top";
+    const endText = (s) => (ends === "both" ? s.replace(/^Top of each/, "Top (and, for ranges shown at both ends, bottom) of each")
+      .replace(/^Top of (.)(.*) \(US\$\)$/, (_, c, r) => `${c.toUpperCase()}${r}, top and bottom of ranges (US$)`)
+      : ends === "bottom" ? s.replace(/^Top of/, "Bottom of") : s);
     $("#scale").closest(".ctl").hidden = bars;
     $("#color-label").textContent = bars ? "Color bars by" : "Color dots by";
 
@@ -493,7 +531,7 @@
     // jobs matching the filters but under another pay basis: say so, with a link (e.g. a site whose jobs state no pay)
     const elsewhere = { hour: 0, piece: 0, none: 0 };
     const narrowed = S.q || S.live || Object.keys(S.f).length;
-    if (narrowed) for (const j of JOBS) if (basisOf(j) !== S.basis && passes(j, "basis")) elsewhere[basisOf(j)]++;
+    if (narrowed) for (const j of jobsPassing("basis")) if (basisOf(j) !== S.basis) elsewhere[basisOf(j)]++;
     const also = Object.entries(elsewhere).filter(([, n]) => n)
       .map(([k, n]) => `<button type="button" class="linkbtn" data-basis="${k}">${fmtInt(n)} under \u201c${esc(BASES[k].label)}\u201d</button>`);
     const alsoText = also.length ? ` <span class="also">Also matching: ${also.join(", ")}.</span>` : "";
@@ -501,7 +539,8 @@
       ? (filtered.length ? `Number of jobs whose listing gives no pay figure; the table shows what each says about pay instead.<br>` +
         `<b>${fmtInt(filtered.length)}</b> jobs match your filters.` : `No job matches these filters.`)
       : pts.length
-        ? `${B.sub}<br><b>${fmtInt(pts.length)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>).`
+        ? `${endText(B.sub)}<br><b>${fmtInt(nJobs)}</b> jobs match your filters (median <b>${money(med)}${B.unit}</b>` +
+          (both ? ` of the ${fmtInt(pts.length)} dots: ${fmtInt(pts.length - nJobs)} ranges are shown at both ends).` : `).`)
         : `No job matches these filters.`) + alsoText;
     $("#chart-sub").querySelectorAll("[data-basis]").forEach((b) => b.onclick = () => setBasis(b.dataset.basis));
     const cd = S.color ? DIMS[DI[S.color]] : null;
@@ -518,9 +557,9 @@
     const logScale = S.scale === "log";
     const tf = logScale ? Math.log : (v) => v;
     const groups = [...by].map(([k, js]) => {
-      if (bars) return { k, label: xd.values[k], js, n: js.length, med: js.length };
+      if (bars) return { k, label: xd.values[k], js, n: js.length, jobs: js.length, med: js.length };
       const v = js.map(yv).sort((a, b) => a - b);
-      const g = { k, label: xd.values[k], js, v, n: v.length,
+      const g = { k, label: xd.values[k], js, v, n: v.length, jobs: jobsOf(js).length,
         q1: d3.quantileSorted(v, 0.25), med: d3.quantileSorted(v, 0.5), q3: d3.quantileSorted(v, 0.75) };
       const iqr = tf(g.q3) - tf(g.q1);
       g.lo = v.find((x) => tf(x) >= tf(g.q1) - 1.5 * iqr);
@@ -580,7 +619,7 @@
     groups.forEach((g) => {
       const src = logoSrc(S.x, g.label);
       const t = gX.append("g").attr("class", "xlabel").attr("transform", `translate(${g.x},${M.t + plotH + 14})`);
-      t.append("title").text(`${g.label}: ${g.n} jobs. Click to show only this group.`);
+      t.append("title").text(`${g.label}: ${g.jobs} jobs. Click to show only this group.`);
       t.append("rect").attr("x", rotate ? -6 : -band / 2).attr("y", -10).attr("width", rotate ? 12 : band).attr("height", rotate ? 14 : 20 + nLines * 14.5)
         .attr("fill", "transparent");
       if (rotate) {
@@ -589,7 +628,7 @@
         const tx = t.append("text").attr("transform", "rotate(-45)").attr("text-anchor", "end").attr("dy", "0.32em")
           .attr("x", lw ? -(LOGO * Math.SQRT1_2 + LOGO_GAP) : 0); // the square's corner, not its side, faces the text
         tx.append("tspan").attr("class", "name").text(lab);
-        tx.append("tspan").attr("class", "n").text(` ${g.n}`);
+        tx.append("tspan").attr("class", "n").text(` ${g.jobs}`);
         if (src) addLogo(t, src, 0, 0);
       } else {
         const lines = wrapLabel(g.label, band - lw);
@@ -600,7 +639,7 @@
           const w = first.node().getComputedTextLength();
           addLogo(t, src, (LOGO + LOGO_GAP) / 2 - w / 2 - LOGO_GAP - LOGO / 2, 0);
         }
-        t.append("text").attr("class", "n").attr("text-anchor", "middle").attr("y", nLines * 14.5 + 2).attr("dy", "0.32em").text(`n=${g.n}`);
+        t.append("text").attr("class", "n").attr("text-anchor", "middle").attr("y", nLines * 14.5 + 2).attr("dy", "0.32em").text(`n=${g.jobs}`);
       }
       t.on("click", () => showOnlyGroup(g.k));
     });
@@ -630,7 +669,7 @@
     gY.selectAll("text").data(ticks).join("text")
       .attr("x", M.l - 8).attr("y", (t) => y(t)).attr("dy", "0.32em").attr("text-anchor", "end").text((t) => money(t));
     svg.append("text").attr("class", "ylab").attr("transform", `translate(12,${M.t + plotH / 2}) rotate(-90)`)
-      .attr("text-anchor", "middle").text(B.axis);
+      .attr("text-anchor", "middle").text(endText(B.axis));
 
     // median of everything shown
     svg.append("line").attr("x1", M.l).attr("x2", width - M.r).attr("y1", y(med)).attr("y2", y(med))
@@ -726,7 +765,7 @@
   }
 
   function showOnlyGroup(k) {
-    const cur = S.f[S.x];
+    const cur = fset(S.x);
     setFilter(S.x, cur && cur.size === 1 && cur.has(k) ? null : new Set([k]));
     S.limit = PAGE;
     update();
@@ -810,7 +849,7 @@
 
   function drawSelection() {
     if (!chartState || !chartState.selRing) return;
-    const d = chartState.nodes.find((n) => n.j.id === S.sel);
+    const d = chartState.nodes.find((n) => n.j.id === S.sel && !n.j.bottom) || chartState.nodes.find((n) => n.j.id === S.sel);
     chartState.selRing.style("display", d ? null : "none");
     if (d) chartState.selRing.attr("cx", d.px).attr("cy", d.py).raise();
   }
@@ -850,7 +889,8 @@
     if (S.color && !["field", "task"].includes(S.color)) rows.push([DIMS[DI[S.color]].label, val(j, S.color)]);
     if (!["site"].includes(S.x) && S.color !== "site") rows.splice(1, 0, ["Site", j.s]);
     return `<b>${esc(j.t)}</b><span class="muted">${esc(j.co || j.s)}</span>
-      <div class="big"><span class="sw" style="background:${col.of(j)}"></span>${money(yv(j))}${S.basis === "hour" ? "/hr" : " per " + (j.unit || "piece")}</div>
+      <div class="big"><span class="sw" style="background:${col.of(j)}"></span>${money(yv(j))}${S.basis === "hour" ? "/hr" : " per " + (j.unit || "piece")}` +
+        `${j.pmin != null && j.pmin !== j.pmax ? `<span class="muted"> ${j.bottom ? "bottom" : "top"} of the range</span>` : ""}</div>
       <div class="muted">as stated: ${esc(payText(j))}</div>
       ${j.ev.Converted ? `<div class="muted">${esc(j.ev.Converted)}</div>` : ""}
       <table>${rows.map(([a, b]) => `<tr><td class="muted">${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</table>
@@ -858,11 +898,12 @@
   }
 
   function groupTip(g) {
-    const rows = [["Jobs", fmtInt(g.n)], ["Median", money(g.med) + BASES[S.basis].unit]];
+    const rows = [["Jobs", fmtInt(g.jobs)], ...(g.n > g.jobs ? [["Dots (both ends of ranges)", fmtInt(g.n)]] : []),
+      ["Median", money(g.med) + BASES[S.basis].unit]];
     if (g.n >= MIN_BOX) rows.push(["Middle half", `${money(g.q1)} – ${money(g.q3)}`]);
     rows.push(["Lowest – highest", `${money(g.v[0])} – ${money(g.v[g.v.length - 1])}`]);
     return `<b>${esc(g.label)}</b><table>${rows.map(([a, b]) => `<tr><td class="muted">${a}</td><td>${b}</td></tr>`).join("")}</table>` +
-      (g.n < MIN_BOX ? `<div class="muted" style="margin-top:6px">Fewer than ${MIN_BOX} jobs: no box.</div>` : "");
+      (g.n < MIN_BOX ? `<div class="muted" style="margin-top:6px">Fewer than ${MIN_BOX} dots: no box.</div>` : "");
   }
 
   function renderLegend(col) {
@@ -889,7 +930,7 @@
     const clearHl = el.querySelector("[data-clearhl]");
     if (clearHl) clearHl.onclick = () => { S.hl = new Set(); update(); };
     const showAll = el.querySelector("[data-showall]");
-    if (showAll) showAll.onclick = () => { delete S.f[S.color]; update(); };
+    if (showAll) showAll.onclick = () => { setFilter(S.color, allValues(S.color)); update(); };
     el.querySelectorAll(".item").forEach((b) => {
       const k = +b.dataset.k, it = col.items.find((i) => i.k === k);
       b.onclick = () => {
@@ -899,7 +940,7 @@
           return;
         }
         const d = DIMS[DI[S.color]];
-        const cur = S.f[S.color] ? new Set(S.f[S.color]) : new Set(d.values.map((_, i) => i));
+        const cur = new Set(fset(S.color) || d.values.map((_, i) => i));
         cur.has(k) ? cur.delete(k) : cur.add(k);
         if (cur.size === 0) return; // keep at least one
         S.hl.delete(k);
@@ -1024,6 +1065,7 @@
       ["Pay", why(payText(j) || val(j, "pay"), "Pay read from")],
       ["Used in the chart", j.h != null ? money(j.h) + "/hr (top of the range), under \u201cPer hour\u201d"
         : j.pt != null ? `${money(j.pt)} per ${j.unit || "piece"} (top of the range), under \u201cPer task or project\u201d` : "not in the chart: no pay figure"],
+      ["Bottom of the range", j.hl != null ? money(j.hl) + "/hr" : j.ptl != null ? `${money(j.ptl)} per ${j.unit || "piece"}` : ""],
       ["Conversion", ev["Converted"]],
       ["Pay as written", ev["Pay as written"]],
       ["Currency", ev["Currency"]],
@@ -1074,7 +1116,7 @@
     const q = (s) => { s = String(s ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const lines = [head.map(q).join(",")];
     for (const j of tableRows) {
-      lines.push([j.t, j.co, j.s, j.u, payText(j), j.h ?? "", j.pt ?? "", j.ev.Converted || "", ...DIMS.map((d) => d.values[j.c[DI[d.key]]]),
+      lines.push([j.t, j.co, j.s, j.u, payText(j), j.h ?? "", j.pt ?? "", j.ev.Converted || "", ...DIMS.map((d) => d.values[j.c[DI[d.key]]].replace(/^Range \(max\)$/, "Range")),
         whoText(j), j.pl.join("; "), j.loc.join("; "), j.posted].map(q).join(","));
     }
     const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });

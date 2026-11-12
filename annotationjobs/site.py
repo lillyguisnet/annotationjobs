@@ -38,7 +38,10 @@ DEGREES = ["None mentioned", "Associate's", "Bachelor's", "Master's", "PhD", "MD
 MODES = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On site", "": "Not stated"}
 CONTRACTS = {"contractor": "Contractor (stated)", "contractor?": "Contract (assumed)", "temporary": "Temporary / fixed-term",
              "internship": "Internship", "permanent": "Permanent employee", "": "Not stated"}
-PAY = ["One figure", "Range", "Only \"up to\"", "No figure, but says how", "Nothing about pay"]
+# a range is plotted at its top ("Range (max)"); its bottom is a second dot, "Range (min)", hidden until asked for
+PAY = ["One figure", "Range (min)", "Range (max)", "Only \"up to\"", "No figure, but says how", "Nothing about pay"]
+RANGE_MIN = PAY[1]
+OFF = {"pay": [RANGE_MIN]}  # values a filter leaves out until the reader ticks them
 DEP_NONE, DEP_UNNAMED = "Not said", "Several factors (not named)"
 UNITS = {"hour": "Hour", "year": "Year (salary)", "month": "Month (salary)", "task": "Task", "session": "Session",
          "project": "Project", "": "Amount, unit not stated", None: "No pay figure"}
@@ -69,7 +72,8 @@ DIMS = [
     ("unit", "Paid per", "What the pay figure is for. Salaries are shown per hour at 40 hours a week.",
      list(UNITS.values()), False),
     ("pay", "How pay is stated", "One figure (you know the rate), a range (you don't know where in it you will be), or only an \"up to\" "
-     "(likely less). A few one-figure listings still say the rate depends on something: see \"What sets the rate\".", PAY, False),
+     "(likely less). A range is a dot at its top, \"Range (max)\"; tick \"Range (min)\" to add a dot at its bottom. "
+     "A few one-figure listings still say the rate depends on something: see \"What sets the rate\".", PAY, False),
     ("dep", "What sets the rate", "What the listing says the pay depends on, next to the figure. A range on its own does not say.",
      None, False),
     ("cur", "Currency", "\"$\" with no currency is taken as US$; other currencies are converted at the day's rate.", CUR, False),
@@ -87,8 +91,8 @@ def years_bucket(j):
 
 def pay_kind(j):
     if j["pay_max"] is None:
-        return PAY[3] if j.get("pay_note") else PAY[4]
-    return PAY[2] if j["pay_min"] is None else PAY[0] if j["pay_min"] == j["pay_max"] else PAY[1]
+        return PAY[4] if j.get("pay_note") else PAY[5]
+    return PAY[3] if j["pay_min"] is None else PAY[0] if j["pay_min"] == j["pay_max"] else PAY[2]
 
 
 def depends_kind(j):
@@ -137,16 +141,19 @@ def money(v, cur="USD"):
     return sym + (f"{v:,.0f}" if v >= 1000 or v == int(v) else f"{v:,.2f}")
 
 
-def pay_in_usd(j, fx):
-    """(US$ per hour, US$ per piece, how it was worked out): the top of the stated range, converted."""
-    unit, top, cur = j.get("pay_unit"), j.get("pay_max"), j.get("pay_currency") or "USD"
+def pay_in_usd(j, fx, end="max"):
+    """(US$ per hour, US$ per piece, how it was worked out): the top of the stated range (end="max") or its
+    bottom (end="min"), converted."""
+    unit, top, cur = j.get("pay_unit"), j.get(f"pay_{end}"), j.get("pay_currency") or "USD"
     if top is None:
         return None, None, ""
     steps = []
     if unit in HOURS:  # a salary: an hourly rate elsewhere in the listing wins
         hourly = [m for m in j.get("pay_all") or [] if m[3] == "hour" and m[1] and m[1] > 1]
         if hourly:
-            top, cur, unit = hourly[0][1], hourly[0][2] or cur, "hour"
+            top, cur, unit = hourly[0][0 if end == "min" else 1], hourly[0][2] or cur, "hour"
+            if top is None:  # the hourly rate is only an "up to": no bottom
+                return None, None, ""
             steps.append(f"hourly rate {money(top, cur)}/hr also in the listing, used instead of the salary")
     if cur != "USD":
         rate = fx["per_usd"].get(cur)
@@ -228,6 +235,7 @@ def build():
             "cur": cur_kind(j),
         }
         hourly, piece, how = pay_in_usd(j, fx)
+        low_h, low_p, _ = pay_in_usd(j, fx, "min") if cat["pay"] == PAY[2] else (None, None, "")
         evidence = {
             "Pay as written": clip(j.get("pay_text")),
             "Pay read from": j.get("pay_source") or "",
@@ -252,6 +260,9 @@ def build():
             "co": j["company"] if j.get("company") and j["company"] != j["site"] else "",
             "pmin": j["pay_min"], "pmax": j["pay_max"], "cur": j.get("pay_currency") or "", "unit": j.get("pay_unit") or "",
             "h": _r(hourly), "pt": _r(piece), "cat": cat, "w": RULE_CODE[j.get("location_rule") or ""],
+            # bottom of a range, on the same basis as the top (the page's "Range (min)" dot)
+            **({"hl": _r(low_h)} if hourly is not None and low_h is not None else {}),
+            **({"ptl": _r(low_p)} if piece is not None and low_p is not None else {}),
             "pl": places_of(j, locations), "loc": locations[:12], "nloc": len(locations), "n": len(copies),
             "lg": list(dict.fromkeys(C.languages(lab) + (lab.get("varieties") or []))),  # for the search box
             "first": min(r["first_seen"] for r in copies), "posted": j.get("posted") or "",
@@ -259,11 +270,13 @@ def build():
         })
     # values of each grouping: natural order when it has one, else by number of jobs
     count = {k: collections.Counter(j["cat"][k] for j in jobs) for k, *_ in DIMS}
+    count["pay"][RANGE_MIN] = sum("hl" in j or "ptl" in j for j in jobs)  # the second dot of a range
     dims = []
     for key, label, help_, values, ordinal in DIMS:
         vals = list(dict.fromkeys(v for v in values if count[key][v])) if values else [v for v, _ in count[key].most_common()]
         assert set(vals) == set(count[key]), (key, set(count[key]) - set(vals))
-        dims.append({"key": key, "label": label, "help": help_, "values": vals, "ordinal": ordinal})
+        dims.append({"key": key, "label": label, "help": help_, "values": vals, "ordinal": ordinal,
+                     **({"off": [v for v in OFF[key] if v in vals]} if key in OFF else {})})
     index = {d["key"]: {v: i for i, v in enumerate(d["values"])} for d in dims}
     for j in jobs:
         j["c"] = [index[d["key"]][j["cat"][d["key"]]] for d in dims]
