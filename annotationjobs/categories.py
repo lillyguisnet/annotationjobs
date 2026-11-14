@@ -7,13 +7,16 @@ and the charts.
 Fields follow the major groups of the US Standard Occupational Classification (SOC 2018, the
 list O*NET uses), merged or split where AI-training work needs it. Chosen and tested on
 2026-11-10 (experiments/categorize/: five models on 60 listings).
+v3 (2026-11-11): talent pools and general sign-ups for mixed AI-training work go to
+ai_answer_training (in v2 the ~100 Welocalize "AI Trainers Network" postings were split
+between labeling, other and AI training).
 """
 
 import hashlib
 import json
 from pathlib import Path
 
-VERSION = "v2"  # change it when the lists or the prompt change: every job is then sorted again
+VERSION = "v3"  # change it when the lists or the prompt change: every job is then sorted again
 MODEL = "openai-codex:gpt-6.1-terra"  # on our ChatGPT plan, thinking off
 STORE = Path(__file__).resolve().parent.parent / "data" / "categories.jsonl"
 
@@ -42,15 +45,15 @@ FIELDS = {
 }
 
 TASKS = {
-    "ai_answer_training": ("Training AI with answers", "write prompts and model answers, solve or check problems, judge or rank chatbot answers, write rubrics, red-team AI (expert or generalist)"),
+    "ai_answer_training": ("Training AI with answers", "write prompts and model answers, solve or check problems, judge or rank chatbot answers, write rubrics, red-team AI (expert or generalist); also general sign-ups to a talent pool or contributor network for several kinds of AI-training work (annotation, evaluation, prompt writing...) when no single task is the main one"),
     "search_ads_content_rating": ("Rating search, ads & content", "rate search results, ads, maps, recommendations or content against guidelines; content moderation"),
-    "data_labeling": ("Labeling data", "label or annotate images, video, text, audio or sensor data (tags, boxes, outlines, categories)"),
+    "data_labeling": ("Labeling data", "label or annotate images, video, text, audio or sensor data (tags, boxes, outlines, categories), when labeling is the main work"),
     "translation_transcription": ("Translation & transcription", "translate, transcribe (including specialist audio such as medical or radio), localize, or review language quality"),
     "recording_data": ("Recording data", "produce recordings that are the dataset: your voice, speech, video, photos, head-camera or sensor/driving data, even when it is called a study"),
     "research_study": ("Paid study", "take part as a subject in a paid study, focus group, interview or user research where your answers, opinions or behaviour are what is studied, not recordings for a dataset"),
     "software_use_testing": ("Using or testing software", "do real tasks in a software application on your own computer while screenshots or screen recordings are captured (computer-use data), or quality-test apps"),
     "staff_role": ("Company staff role", "an employee role running the company or its projects (building the product, managing annotators or projects, recruiting, sales), not doing the data tasks yourself"),
-    "other": ("Other", "none of the above"),
+    "other": ("Other", "none of the above (not for talent pools of AI-training work: those are ai_answer_training)"),
 }
 
 NOT_SORTED = "Not sorted yet"
