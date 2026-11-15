@@ -41,8 +41,11 @@ button, input, select { font: inherit; color: inherit; }
 .bar-row { display: flex; align-items: center; gap: 12px; }
 .bar-main { padding: 10px 0; flex-wrap: wrap; row-gap: 8px; }
 .bar-filters { padding: 9px 0 10px; border-top: 1px solid var(--line-soft); align-items: flex-start; }
-.zone { display: flex; align-items: center; gap: 10px; flex: none; }
-.pay-filters { flex-wrap: nowrap; }
+.zone { display: flex; align-items: center; gap: 10px; flex: 0 1 auto; min-width: 0; }
+/* the pay filters sit in line with the pay switch and wrap, one button at a time, when the window is too narrow */
+.zone-pay { flex-wrap: wrap; gap: 8px 5px; }
+.zone-pay .seg.basis { margin-right: 5px; }
+.filters.pay-filters { display: contents; }
 .vdiv { width: 1px; height: 26px; background: var(--line); flex: none; margin: 0 4px; }
 .filters { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-width: 0; }
 .search { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid transparent; border-radius: 10px;
@@ -219,11 +222,10 @@ tr.detail td { background: #fbfcfe; padding-top: 4px; padding-bottom: 16px; }
 .about .muted { color: var(--ink-3); }
 .foot { color: var(--ink-3); font-size: 12.5px; margin: 14px 0 0; }
 
-/* mid-size screens: the search box gets its own line, under the pay controls */
-@media (min-width: 721px) and (max-width: 1150px) {
-  .vdiv { display: none; }
-  .search { flex-basis: 100%; }
-}
+/* the search box goes on its own line, without the divider, when the pay controls leave it too little room
+   (app.js sets .stacked from the buttons' own widths, so the layout cannot flip back and forth) */
+.bar-main.stacked .vdiv { display: none; }
+.bar-main.stacked .search { flex-basis: 100%; }
 
 @media (max-width: 720px) {
   .wrap { padding: 0 12px; }
@@ -233,7 +235,7 @@ tr.detail td { background: #fbfcfe; padding-top: 4px; padding-bottom: 16px; }
   /* phone: pay switch, then search, then one sideways-scrolling row of filters */
   .bar-main { flex-wrap: wrap; gap: 8px; padding: 8px 0; }
   .zone-pay { width: 100%; }
-  .pay-filters { display: none; }
+  .filters.pay-filters { display: none; }
   .vdiv { display: none; }
   .seg.basis { flex: 1; height: 34px; }
   .seg.basis button { flex: 1; justify-content: center; padding: 0 6px; font-size: 13px; }

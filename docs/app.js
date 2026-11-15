@@ -281,6 +281,19 @@
     const place = () => (SMALL.matches ? box.prepend(...payFilters) : payBox.append(...payFilters));
     place();
     SMALL.addEventListener("change", () => { closePop(); place(); });
+    // pay controls and search box share one line only if the pay controls fit unwrapped next to a search box of
+    // its usual width (240px), plus the divider and the gaps around it (33px)
+    const main = $(".bar-main");
+    const stack = () => {
+      const kids = [...zone.querySelectorAll(".seg.basis, .fbtn")].filter((el) => el.offsetParent && zone.contains(el));
+      const cs = getComputedStyle(zone), gap = parseFloat(cs.columnGap) || 0;
+      const w = kids.reduce((a, el) => { const m = getComputedStyle(el); return a + el.offsetWidth + parseFloat(m.marginLeft) + parseFloat(m.marginRight); }, 0)
+        + gap * Math.max(0, kids.length - 1);
+      main.classList.toggle("stacked", w + 33 + 240 > main.clientWidth);
+    };
+    const ro = new ResizeObserver(stack);
+    ro.observe(main);
+    zone.querySelectorAll(".seg.basis, .fbtn").forEach((el) => ro.observe(el)); // a button's text grows with its filter
   }
 
   function refreshFilterButtons() {
