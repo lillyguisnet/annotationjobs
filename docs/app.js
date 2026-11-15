@@ -414,11 +414,11 @@
       <div class="pop-body">
         <label>Country<select id="live">
           <option value="">Any country (no filter)</option>
-          ${COUNTRIES.map((c) => `<option value="${esc(c)}" ${c === S.live ? "selected" : ""}>${esc(c)} (${fmtInt(counts.get(c))} name it)</option>`).join("")}
+          ${COUNTRIES.map((c) => `<option value="${esc(c)}" ${c === S.live ? "selected" : ""}>${esc(c)} (${fmtInt(counts.get(c))})</option>`).join("")}
         </select></label>
         <label class="check"><input type="checkbox" id="unclear" ${S.unclear ? "checked" : ""}>
           <span>Also keep jobs that do not say who can apply (${fmtInt(unclear)})</span></label>
-        <p class="hint">Read from the listings automatically: check the listing itself before applying.</p>
+        <p class="hint">Number after each country: jobs that name it. Read from the listings automatically: check the listing itself before applying.</p>
       </div>`;
     pop.querySelector("#live").onchange = (e) => { S.live = e.target.value; S.limit = PAGE; update(); };
     pop.querySelector("#unclear").onchange = (e) => { S.unclear = e.target.checked; update(); };
