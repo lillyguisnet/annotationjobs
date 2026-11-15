@@ -169,6 +169,10 @@ Thread texts stay on `/mnt/bulk/lilly/annotationjobs/community/` (other people's
 
 ## Not covered
 
+The public page lists these at the bottom (`UNREADABLE` in `annotationjobs/boards.py`), with the boards that were
+read but had no AI-training job open (worked out from `data/sources.json` at each build).
+
+
 - TELUS Digital AI Community: its pages are behind Cloudflare and its job list is inside a sign-in
   app. Turing's own site blocks automated visits (Turing's Greenhouse board is covered).
 - Prolific: its work is studies shown after signing up; its own board has staff roles only.

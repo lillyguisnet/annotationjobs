@@ -208,6 +208,8 @@ tr.detail td { background: #fbfcfe; padding-top: 4px; padding-bottom: 16px; }
 /* about */
 .about ul { margin: 10px 0 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 6px; max-width: 920px; }
 .about b { color: var(--ink); }
+.about .sub { margin: 14px 0 0; color: var(--ink-2); }
+.about .muted { color: var(--ink-3); }
 .foot { color: var(--ink-3); font-size: 12.5px; margin: 14px 0 0; }
 
 /* mid-size screens: the search box gets its own line, under the pay controls */

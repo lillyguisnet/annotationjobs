@@ -105,3 +105,27 @@ BOARDS = [
     B("workday-nvidia", "NVIDIA", "bigtech", ats.workday, host="nvidia.wd5.myworkdayjobs.com", tenant="nvidia",
       site_id="NVIDIAExternalCareerSite", search=bigtech.KEYWORDS),
 ]
+
+
+# Sites checked that give no readable public job list (shown at the bottom of the public page).
+# reason: blocked | signin | nolist | down. Checked in November 2026 (experiments/community-survey/).
+UNREADABLE = [
+    ("TELUS Digital AI Community", "telusinternational.ai", "blocked",
+     "pages behind a bot check; the job list is inside an app you sign in to"),
+    ("Turing", "turing.com", "blocked", "its own site refuses automated visits; its hiring board is read and had only staff jobs"),
+    ("Prolific", "prolific.com", "signin", "paid studies appear only after signing up"),
+    ("CrowdGen (Appen)", "crowdgen.com", "signin", "projects appear only after signing up; Appen's public board is read"),
+    ("Clickworker (LXT)", "clickworker.com", "signin", "jobs and UHRS tasks appear only after signing up"),
+    ("Uber AI Solutions", "uber.com", "nolist", ""),
+    ("Deccan AI Experts", "deccanexperts.ai", "nolist", ""),
+    ("LXT", "lxt.ai", "nolist", "its jobs page describes the work but lists no roles"),
+    ("DataForce (TransPerfect)", "dataforce.ai", "nolist", ""),
+    ("Stellar AI", "stellarai.io", "nolist", ""),
+    ("Rex.zone", "rex.zone", "nolist", "the page is built in the browser and has no readable list"),
+    ("Meta, Microsoft, Tesla", "", "nolist", "no readable public feed of their career sites"),
+    ("Ethos AI", "", "down", "named by workers on Reddit; no site of it answered"),
+    ("Babel Audio", "babelaudio.com", "down", ""),
+    ("Toloka's task site", "toloka.ai", "down", "its own work is listed through Mindrift"),
+]
+UNREADABLE_WHY = {"blocked": "Refuse automated reading", "signin": "Show the work only after you sign up",
+                  "nolist": "No public job list found", "down": "Did not answer"}

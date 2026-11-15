@@ -34,7 +34,7 @@
   const UNIT = { hour: "/hr", year: "/year", month: "/month", project: " per project", task: " per task", session: " per session" };
   const DEFAULTS = { basis: "hour", x: "field", color: "pay", sort: "auto", scale: "log" };
 
-  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE, LOGOS, OWNERS;
+  let DIMS, DI, JOBS, SNAPSHOT, COLLECTED_FROM, POSTINGS, COUNTRIES, FXDATE, LOGOS, OWNERS;
   // POINTS: what the chart can draw. Each job is one point at the top of its pay; a range also has a second point at its
   // bottom ("Range (min)" under "How pay is stated"), which inherits everything else from its job. The table lists jobs.
   let POINTS, OFF;
@@ -68,6 +68,7 @@
     DI = Object.fromEntries(DIMS.map((d, i) => [d.key, i]));
     JOBS = data.jobs;
     SNAPSHOT = data.snapshot;
+    COLLECTED_FROM = data.collected_from;
     POSTINGS = data.postings;
     FXDATE = data.fx && data.fx.date;
     LOGOS = data.logos || {};
@@ -101,9 +102,10 @@
       `<b>${fmtInt(JOBS.length)}</b> open jobs (${fmtInt(POSTINGS)} postings with each city's copy counted) from <b>${sites}</b> sites.`,
       `<b>${fmtInt(nh)}</b> give an hourly rate or a salary, <b>${fmtInt(np)}</b> a rate per task or project.`,
       `Overall median: <b>${money(medAll)}/hr</b>.`,
-      `Collected ${niceDate(SNAPSHOT)}.`,
+      `Collected ${collected()}.`,
     ].map((l) => `<span class="line">${l}</span>`).join("");
-    $("#foot").innerHTML = `Data collected ${niceDate(SNAPSHOT)} from the sites' public job pages. ` +
+    renderUnlisted(data);
+    $("#foot").innerHTML = `Data collected ${collected()} from the sites' public job pages. ` +
       (FXDATE ? `Other currencies converted to US$ at the European Central Bank rates of ${niceDate(FXDATE)}. ` : "") +
       `Code, method and full data: <a href="https://github.com/lillyguisnet/annotationjobs">github.com/lillyguisnet/annotationjobs</a>.`;
     let lastW = 0;
@@ -112,6 +114,14 @@
       if (w !== lastW) { lastW = w; renderChart(); }
     }, 80)).observe($("#chart-scroll"));
     update();
+  }
+
+  // "6–15 November 2026" when the sites were not all read on the same day
+  function collected() {
+    const a = COLLECTED_FROM || SNAPSHOT;
+    if (a === SNAPSHOT) return niceDate(SNAPSHOT);
+    const [ya, ma] = a.split("-"), [yb, mb] = SNAPSHOT.split("-");
+    return ya === yb && ma === mb ? `${+a.slice(8)}\u2013${niceDate(SNAPSHOT)}` : `${niceDate(a)} to ${niceDate(SNAPSHOT)}`;
   }
 
   function niceDate(s) {
@@ -884,6 +894,23 @@
     tip.style.top = Math.max(0, Math.min(y - h / 2, wrap.height - h)) + "px";
   }
   function hideTip() { $("#tip").hidden = true; }
+
+  // sites checked that put nothing in the chart: unreadable ones (with why), then boards read with no AI-training job open
+  function renderUnlisted(data) {
+    const link = (name, url) => (url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name));
+    const groups = d3.groups(data.unread || [], (u) => u.why);
+    const unread = groups.map(([why, us]) => `<li><b>${esc(why)}:</b> ` +
+      us.map((u) => link(u.name, u.url) + (u.note ? ` <span class="muted">(${esc(u.note)})</span>` : "")).join(", ") + ".</li>").join("");
+    const empty = data.empty || [];
+    const byKind = d3.groups(empty, (e) => e.kind);
+    const emptyList = byKind.map(([kind, es]) => `<li><b>${esc(kind)}:</b> ` + es.map((e) => esc(e.site) +
+      (e.via.length ? ` <span class="muted">(its contributor work is listed under ${e.via.map(esc).join(", ")})</span>` : "")).join(", ") + ".</li>").join("");
+    const checked = d3.max(empty, (e) => e.checked);
+    $("#unlisted").innerHTML =
+      `<p class="sub">These sites were looked at but give no job list we can read:</p><ul>${unread}</ul>` +
+      (empty.length ? `<p class="sub">These companies' job boards were read${checked ? ` (last on ${niceDate(checked)})` : ""}, but no AI-training or annotation job was open: only staff roles such as engineers or sales.</p><ul>${emptyList}</ul>` : "") +
+      `<p class="sub">Some platforms in the chart show more work once you sign in (DataAnnotation's projects, Remotasks' tasks); only their public listings are counted.</p>`;
+  }
 
   function jobTip(j, col, touch) {
     const rows = [["Field", val(j, "field")], ["Task", val(j, "task")], ["Who can apply", whoText(j)]];

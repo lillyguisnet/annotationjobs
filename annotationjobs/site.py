@@ -21,6 +21,7 @@ from pathlib import Path
 
 from . import categories as C
 from .collect import all_listings
+from .boards import UNREADABLE, UNREADABLE_WHY
 from .groups import KIND_NAME, RULES, degree_level, owner_of
 from .logos import logo_paths
 from .places import COUNTRIES, ISO, STATE, normalize_places, places_in
@@ -207,9 +208,26 @@ def quotes(pairs):
     return " … ".join(q for q, found in pairs or [] if found)
 
 
+def empty_boards(sources, shown):
+    """Boards read on the last collection with no AI-training job open, and where that company's
+    contributor work is listed instead when it is on the page (Labelbox -> Alignerr...)."""
+    out = {}
+    for src, info in sorted(sources.items()):
+        site = info.get("site") or src
+        if info.get("kept") or info.get("last_error") or site in shown or site.replace(" (staff board)", "") in shown:
+            continue
+        owner = owner_of(site)[0]
+        via = sorted(s for s in shown if owner_of(s)[0] == owner and s != site)
+        e = out.setdefault(site, {"site": site, "kind": KIND_NAME.get(info.get("kind"), ""), "read": 0,
+                                  "checked": info.get("last_run", ""), "via": via})
+        e["read"] += info.get("fetched") or 0
+    return sorted(out.values(), key=lambda e: (list(KIND_NAME.values()).index(e["kind"]) if e["kind"] in KIND_NAME.values() else 9,
+                                               e["site"].lower()))
+
+
 def build():
     labels = C.load()
-    rows, _ = all_listings()
+    rows, sources = all_listings()
     groups = collections.defaultdict(list)
     for r in rows:
         if r["active"]:
@@ -292,7 +310,12 @@ def build():
             "fx": {"date": fx["date"], "source": fx["source"]},
             "logos": logo_paths([v for d in dims if d["key"] in ("site", "owner") for v in d["values"]]),
             # site -> what is known about the company behind it, and where it was read (shown with each job)
-            "owners": {v: owner_of(v)[1] for v in next(d["values"] for d in dims if d["key"] == "site") if owner_of(v)[1]}}  # site -> its small logo (docs/logos/, python3 -m annotationjobs.logos)
+            "owners": {v: owner_of(v)[1] for v in next(d["values"] for d in dims if d["key"] == "site") if owner_of(v)[1]},
+            "unread": [{"name": n, "url": f"https://{d}" if d else "", "why": UNREADABLE_WHY[w], "note": note}
+                       for n, d, w, note in UNREADABLE],
+            "empty": empty_boards(sources, {j["s"] for j in jobs}),
+            # first day of the collection the jobs shown come from (sources are not always all read the same day)
+            "collected_from": min(sources[r["source"]]["last_run"] for c in groups.values() for r in c)}  # site -> its small logo (docs/logos/, python3 -m annotationjobs.logos)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     n_h, n_p = sum(j["h"] is not None for j in jobs), sum(j["pt"] is not None for j in jobs)
