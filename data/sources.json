@@ -506,6 +506,19 @@
   "stored": 0,
   "token": "figure"
  },
+ "gh-humansignal": {
+  "active": 28,
+  "dropped": 5,
+  "fetched": 33,
+  "kept": 28,
+  "kind": "vendor",
+  "last_run": "2026-11-15",
+  "reader": "greenhouse",
+  "seconds": 1,
+  "site": "HumanSignal",
+  "stored": 28,
+  "token": "humansignal"
+ },
  "gh-invisible": {
   "active": 0,
   "dropped": 5,
@@ -544,6 +557,19 @@
   "site": "Labelbox",
   "stored": 0,
   "token": "labelbox"
+ },
+ "gh-meridial": {
+  "active": 760,
+  "dropped": 67,
+  "fetched": 827,
+  "kept": 760,
+  "kind": "marketplace",
+  "last_run": "2026-11-15",
+  "reader": "greenhouse",
+  "seconds": 1,
+  "site": "Meridial (Invisible)",
+  "stored": 760,
+  "token": "agency"
  },
  "gh-prolific": {
   "active": 0,

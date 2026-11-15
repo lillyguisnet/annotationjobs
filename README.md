@@ -1,9 +1,9 @@
 # annotationjobs
 
 Open AI-training and data-annotation work, collected from the contributor platforms
-(Mercor, Handshake AI, micro1, Alignerr, Outlier, DataAnnotation, Mindrift, OneForma,
+(Mercor, Handshake AI, micro1, Alignerr, Outlier, DataAnnotation, Mindrift, Meridial, OneForma,
 Appen, RWS TrainAI, Lionbridge...), the data companies' own boards (Scale AI, Welocalize,
-CloudFactory, Centific...) and the AI labs' careers boards (Cohere, Mistral, xAI,
+CloudFactory, Centific, HumanSignal...) and the AI labs' careers boards (Cohere, Mistral, xAI,
 Anthropic, OpenAI, Google DeepMind, ...), with pay, experience asked, degrees and the
 full listing text.
 
@@ -111,6 +111,10 @@ All of this is redone from the stored text, without fetching, by `--reparse`
 - Degrees: degrees *mentioned* in the text, required or not.
 - Company boards (`vendor`, `lab`, `bigtech`): kept only when the title reads as annotation /
   AI-training work (`classify` in `annotationjobs/common.py`).
+- Meridial (Invisible Technologies' contributor marketplace, Greenhouse board `agency`) also carries
+  outsourced office work for Invisible's clients (custody operations, payroll, customer support): a
+  posting is kept when its title reads as AI work or its text says the work trains or evaluates AI
+  (`AI_WORK` in `annotationjobs/boards.py`); the others are in `data/dropped/gh-meridial.tsv`.
 
 ## Field, kind of task and language (language model)
 
@@ -162,8 +166,11 @@ Thread texts stay on `/mnt/bulk/lilly/annotationjobs/community/` (other people's
 
 ## Not covered
 
-- TELUS Digital AI Community and Turing's own site block automated visits (Turing's Greenhouse
-  board is covered).
+- TELUS Digital AI Community: its pages are behind Cloudflare and its job list is inside a sign-in
+  app. Turing's own site blocks automated visits (Turing's Greenhouse board is covered).
+- Prolific: its work is studies shown after signing up; its own board has staff roles only.
+- Named by workers on Reddit, no public job list found (2026-11-15): Ethos AI, Stellar AI, Babel Audio,
+  Uber AI Solutions, Deccan AI, LXT, DataForce (`experiments/community-survey/`).
 - Meta, Microsoft and Tesla career sites (no readable public feed found).
 - Rex.zone (page built in the browser only); Toloka's own task site (down).
 - Platforms that only show tasks after you sign in (DataAnnotation's projects, Prolific

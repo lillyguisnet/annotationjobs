@@ -41,7 +41,7 @@ UNIT_WORDS = [
 ]
 UNIT = re.compile(r"\s*(?:/|per|an|a|par|pro|por|each|for (?:each|every|a|one|the)?)\s*(?:(?:full|entire|whole|complete|total) )?(?:" +
                   "|".join(f"(?P<{n}>{rx})" for n, rx in UNIT_WORDS) + r")", re.I)
-RANGE_SEP = re.compile(r"^\s*(?:-|–|—|to|and|à|a|bis|hasta|~)\s*$", re.I)
+RANGE_SEP = re.compile(r"^\s*(?:[-‑]\s*to\s*[-‑]|-|‑|–|—|to|and|à|a|bis|hasta|~)\s*$", re.I)  # ‑ = non-breaking hyphen; "$8-to-$65"
 NEAR = re.compile(r"compensat|\bpay|paid|\brate|salary|wage|earn|remunerat|fee\b|stipend|incentive|honorari|"
                   r"tarif|vergütung|gehalt|sueldo|salario|pago", re.I)
 UPTO = re.compile(r"(up to|as much as|max(?:imum)?|hasta|jusqu'?à|bis zu)\s*$", re.I)
@@ -93,7 +93,7 @@ def pay_mentions(text):
             explicit = a["explicit"] or b["explicit"]
         else:
             # bare second number of a range: "$40-75/hr", "€30 – 45 per hour"
-            m = re.match(rf"\s*(?:-|–|—|to|and)\s*(?P<n>{NUM})\s?(?P<k>[kK]\b)?(?:\s?(?P<post>{_post})(?![A-Za-z]))?", text[a["e"]:])
+            m = re.match(rf"\s*(?:[-‑]\s*to\s*[-‑]|-|‑|–|—|to|and)\s*(?P<n>{NUM})\s?(?P<k>[kK]\b)?(?:\s?(?P<post>{_post})(?![A-Za-z]))?", text[a["e"]:])
             if m and a["unit"] is None:
                 lo, hi = a["v"], _num(m.group("n"), m.group("k") or ("k" if a["v"] >= 1000 and _num(m.group("n"), None) < 1000 else None))
                 e = a["e"] + m.end()
@@ -259,6 +259,7 @@ DEPENDS = [re.compile(x.replace("RUN", _RUN), re.I) for x in (  # strongest firs
     r"rates? (?:may )?vary(?: widely)?RUN{0,120}",
     r"based on (?:the |your )?(?:task|project|level|tier|experience|location|country)RUN{0,100}",
     r"commensurate with RUN{3,100}", r"determined by RUN{3,100}",
+    r"(?:rate|pay) (?:is )?determined (?:after|based on|by|from) RUN{3,100}",
     r"according to (?:your )?(?:level|tier|experience)RUN{0,80}", r"median at your tier")]
 # what the quote says pay depends on; first match wins for a stretch of text ("based on tasks completed" is
 # the amount of work, not the kind)

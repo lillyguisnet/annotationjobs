@@ -8,11 +8,17 @@ from .common import classify, fetch, fetch_json, html_to_text, listing, save_raw
 import html as htmllib
 
 
-def _rel(board, title, dept=""):
-    """Marketplace boards: every posting is contributor work. Company boards: filter by title."""
+def _rel(board, title, dept="", text=""):
+    """Marketplace boards: every posting is contributor work. Company boards: filter by title,
+    and on boards with `also_text`, also by what the listing says the work is."""
     if board.get("all_relevant"):
         return True, "contributor board"
-    return classify(title, dept, board.get("also"))
+    rel, why = classify(title, dept, board.get("also"))
+    if not rel and board.get("also_text"):
+        m = re.search(board["also_text"], text or "", re.I)
+        if m:
+            return True, f"text: '{m.group(0).lower()}'"
+    return rel, why
 
 
 # --- Greenhouse -----------------------------------------------------------------
@@ -26,7 +32,7 @@ def greenhouse(board):
         content = htmllib.unescape(j.get("content") or "")
         text = html_to_text(content)
         depts = ", ".join(d["name"] for d in j.get("departments") or [])
-        rel, why = _rel(board, j["title"], depts)
+        rel, why = _rel(board, j["title"], depts, text)
         out.append(listing(
             board["site"], board["source"], j["id"], j["title"], j["absolute_url"], text,
             company=j.get("company_name") or board["site"],

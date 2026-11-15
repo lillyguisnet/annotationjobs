@@ -1,0 +1,324 @@
+{
+ "Mindrift": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "Alignerr": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   2
+  ]
+ },
+ "micro1": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   14
+  ]
+ },
+ "Welocalize": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "Handshake AI": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   5
+  ]
+ },
+ "RWS": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "Lionbridge": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "Appen": {
+  "sitejabber": [
+   200,
+   "\"ratingValue\":\"2.0\",\"reviewCount\":7"
+  ],
+  "pissedconsumer": [
+   200,
+   "5 reviews"
+  ],
+  "hackernews": [
+   200,
+   7
+  ]
+ },
+ "CloudFactory": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "G2i": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   1
+  ]
+ },
+ "Scale AI": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   103
+  ]
+ },
+ "Remotasks": {
+  "sitejabber": [
+   200,
+   "\"ratingValue\":\"2.1\",\"reviewCount\":49"
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "OneForma": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   0
+  ]
+ },
+ "Centific": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   1
+  ]
+ },
+ "Sama": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   247
+  ]
+ },
+ "Surge AI": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   8
+  ]
+ },
+ "TELUS Digital": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   1
+  ]
+ },
+ "Prolific": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   391
+  ]
+ },
+ "Turing": {
+  "sitejabber": [
+   200,
+   "\"ratingValue\":\"3.9\",\"reviewCount\":136"
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   1632
+  ]
+ },
+ "Toloka": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   2
+  ]
+ },
+ "Outlier": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   "3 reviews"
+  ],
+  "hackernews": [
+   200,
+   904
+  ]
+ },
+ "DataAnnotation": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   404,
+   null
+  ],
+  "hackernews": [
+   200,
+   5
+  ]
+ },
+ "Mercor": {
+  "sitejabber": [
+   200,
+   null
+  ],
+  "pissedconsumer": [
+   200,
+   null
+  ],
+  "hackernews": [
+   200,
+   63
+  ]
+ }
+}

@@ -7,7 +7,7 @@ place in every grouping the page offers. The page plots the top of the stated pa
 ("up to $X" counts as X), either per hour or per task / project:
 
 - per hour: hourly rates, and salaries where the listing gives no hourly rate, at 40 hours a week
-  (a year = 2,080 hours, a month = 2,080 / 12 hours);
+  (a year = 2,080 hours, a month = 2,080 / 12 hours, a week = 40 hours, a day = 8 hours);
 - other currencies are converted with the European Central Bank's rates of the day the page data was
   first built for a snapshot (data/fx.json, kept so a rebuild gives the same numbers).
 """
@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "data" / "jobs.json"
 FX = ROOT / "data" / "fx.json"
 FX_URL = "https://api.frankfurter.dev/v1/latest?base=USD"  # European Central Bank reference rates
-HOURS = {"year": 52 * 40, "month": 52 * 40 / 12}  # 40 hours a week
+HOURS = {"year": 52 * 40, "month": 52 * 40 / 12, "week": 40, "day": 8}  # 40 hours a week
 PIECE_UNITS = ("task", "project", "session", "")  # "" = an amount with no unit ("$1,000 per successful placement")
 
 YEARS = ["Not stated", "Preferred only", "1 year or less", "2 years", "3 years", "4–5 years", "6+ years"]
@@ -43,7 +43,8 @@ PAY = ["One figure", "Range (min)", "Range (max)", "Only \"up to\"", "No figure,
 RANGE_MIN = PAY[1]
 OFF = {"pay": [RANGE_MIN]}  # values a filter leaves out until the reader ticks them
 DEP_NONE, DEP_UNNAMED = "Not said", "Several factors (not named)"
-UNITS = {"hour": "Hour", "year": "Year (salary)", "month": "Month (salary)", "task": "Task", "session": "Session",
+UNITS = {"hour": "Hour", "year": "Year (salary)", "month": "Month (salary)", "week": "Week", "day": "Day",
+         "task": "Task", "session": "Session",
          "project": "Project", "": "Amount, unit not stated", None: "No pay figure"}
 # location rule -> short code the page uses for "open to people in <country>"
 RULE_CODE = {"only listed places": "only", "anywhere": "any", "anywhere except excluded": "except", "must come on site": "onsite",
@@ -168,7 +169,7 @@ def pay_in_usd(j, fx, end="max"):
         return top, None, "; ".join(steps)
     if unit in PIECE_UNITS:
         return None, top, "; ".join(steps)
-    return None, None, "; ".join(steps)  # per day / week: not shown
+    return None, None, "; ".join(steps)
 
 
 def places_of(j, locations):

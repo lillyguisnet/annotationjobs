@@ -10,6 +10,11 @@ kind:
 from . import ats, bigtech, marketplaces as mp
 
 
+# A listing text saying the work trains or evaluates AI (for boards that mix it with other work).
+AI_WORK = (r"\btrain(?:ing|s)? (?:the )?(?:AI|models?|LLMs?|frontier)|\bAI (?:training|trainers?|models?|systems?)\b"
+           r"|\bRLHF\b|\b(?:LLM|model) (?:outputs?|responses?|evaluation)|\btraining data\b|\bfrontier (?:AI|labs?|models?)")
+
+
 def B(source, site, kind, reader, token=None, **kw):
     return {"source": source, "site": site, "kind": kind, "reader": reader, "token": token,
             "all_relevant": kind == "marketplace", **kw}
@@ -25,6 +30,11 @@ BOARDS = [
     B("dataannotation", "DataAnnotation", "marketplace", mp.dataannotation),
     B("oneforma", "OneForma", "marketplace", mp.oneforma),
     B("mindrift", "Mindrift (Toloka)", "marketplace", ats.workable, "toloka-ai", detail_limit=0),
+    # Invisible Technologies' contributor marketplace. Its board also carries outsourced office work
+    # for Invisible's clients (custody operations, payroll, customer support), so postings are
+    # kept by title or when the text says the work trains or evaluates AI.
+    B("gh-meridial", "Meridial (Invisible)", "marketplace", ats.greenhouse, "agency", all_relevant=False,
+      also=r"\bAI\b|trainer|auditor", also_text=AI_WORK),
     # data / annotation companies' own careers boards
     B("gh-scaleai", "Scale AI", "vendor", ats.greenhouse, "scaleai"),
     B("gh-remotasks", "Remotasks", "vendor", ats.greenhouse, "remotasks"),
@@ -36,6 +46,7 @@ BOARDS = [
     B("gh-toloka", "Toloka", "vendor", ats.greenhouse, "toloka"),
     B("gh-turing", "Turing", "vendor", ats.greenhouse, "turing"),
     B("gh-sama", "Sama", "vendor", ats.greenhouse, "samainc"),
+    B("gh-humansignal", "HumanSignal", "vendor", ats.greenhouse, "humansignal"),  # Label Studio's makers; "AI Trainers" team
     B("ashby-surge", "Surge AI", "vendor", ats.ashby, "surge-ai"),
     B("ashby-abaka", "Abaka AI", "vendor", ats.ashby, "abaka.ai"),
     B("ashby-pareto", "Pareto.AI", "vendor", ats.ashby, "pareto-ai"),
