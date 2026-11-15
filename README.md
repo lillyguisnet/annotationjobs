@@ -22,7 +22,7 @@ with a language model (it needs `lm15` and runs through `uv`, see below). Charts
 ## Public page
 
 `docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
-job's pay range in US$, grouped and colored by any of site, type of site, field, kind of task, language, degree, experience, work
+job's pay range in US$, grouped and colored by any of site, company behind it, type of site, field, kind of task, language, degree, experience, work
 mode, who can apply, kind of job, what the pay is per, how it is stated (one figure, a range, or only "up to"; a range is plotted at its top, and
 "Range (min)" adds a second dot at its bottom),
 what the listing says it depends on, and its currency, with filters
@@ -37,6 +37,9 @@ The view is kept in the address, so a link reopens it.
 - `docs/data/jobs.json` is rebuilt by every `collect` run (or alone: `python3 -m annotationjobs.site`):
   one record per distinct open job, with the sentences behind each value. Commit and push it to update
   the page.
+- Company behind each site (Outlier and Remotasks → Scale AI, DataAnnotation → Surge AI, Alignerr → Labelbox,
+  Mindrift → Toloka, Meridial → Invisible, OneForma → Centific...): `OWNERS` in `annotationjobs/groups.py`, with what is
+  known and where it was read (checked 2026-11-15), shown with each job.
 - Groupings shared with the charts live in `annotationjobs/groups.py` and `annotationjobs/categories.py`.
 - Site logos (chart labels, legend, table, site filter) are the sites' own icons, downloaded once into
   `docs/logos/` and served with the page: `python3 -m annotationjobs.logos` fetches the missing ones

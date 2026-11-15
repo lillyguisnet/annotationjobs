@@ -21,7 +21,7 @@ from pathlib import Path
 
 from . import categories as C
 from .collect import all_listings
-from .groups import KIND_NAME, RULES, degree_level
+from .groups import KIND_NAME, RULES, degree_level, owner_of
 from .logos import logo_paths
 from .places import COUNTRIES, ISO, STATE, normalize_places, places_in
 from .terms import pay_factors
@@ -55,6 +55,10 @@ CUR = ["US$ (stated)", "\"$\" on a US-only job", "\"$\" assumed to be US$", "Con
 # key, label, help, values (in their natural order), ordinal (natural order means something)
 DIMS = [
     ("site", "Site", "Where the job is posted.", None, False),
+    ("owner", "Company behind it", "The company that runs the site. Several sites are one company: Outlier and Remotasks "
+     "are Scale AI's, DataAnnotation is Surge AI's (reported by the press; the site does not say), Alignerr is Labelbox's, "
+     "Mindrift is Toloka's, Meridial is Invisible Technologies', OneForma is Centific's. Open a job to see the source.",
+     None, False),
     ("kind", "Type of site", "Contributor platforms (Mercor, Outlier...), data companies' own job boards, AI labs, big tech.",
      list(KIND_NAME.values()), False),
     ("field", "Field", "The specialist knowledge the job asks for, read from the full listing by a language model "
@@ -221,6 +225,7 @@ def build():
         lab = C.label_for(copies, labels) or {}
         cat = {
             "site": j["site"],
+            "owner": owner_of(j["site"])[0],
             "kind": KIND_NAME[j["kind"]],
             "field": C.FIELDS[lab["field"]][0] if lab else C.NOT_SORTED,
             "task": C.TASKS[lab["task"]][0] if lab else C.NOT_SORTED,
@@ -285,7 +290,9 @@ def build():
     jobs.sort(key=lambda j: (-(j["h"] or 0), j["t"]))
     data = {"snapshot": snapshot, "dims": dims, "jobs": jobs, "postings": sum(j["n"] for j in jobs),
             "fx": {"date": fx["date"], "source": fx["source"]},
-            "logos": logo_paths(next(d["values"] for d in dims if d["key"] == "site"))}  # site -> its small logo (docs/logos/, python3 -m annotationjobs.logos)
+            "logos": logo_paths([v for d in dims if d["key"] in ("site", "owner") for v in d["values"]]),
+            # site -> what is known about the company behind it, and where it was read (shown with each job)
+            "owners": {v: owner_of(v)[1] for v in next(d["values"] for d in dims if d["key"] == "site") if owner_of(v)[1]}}  # site -> its small logo (docs/logos/, python3 -m annotationjobs.logos)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     n_h, n_p = sum(j["h"] is not None for j in jobs), sum(j["pt"] is not None for j in jobs)

@@ -18,7 +18,7 @@
     "#1d2b53", "#8a8f1c", "#7a1f3d"];
   const RAMP = d3.interpolateRgbBasis(["#f2b134", "#e4572e", "#b8336a", "#5b2a86", "#16324f"]);
   const NEUTRAL = new Set(["Not sorted yet", "English only", "Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated", "Not said"]);
-  const FILTER_ORDER = ["field", "task", "lang", "site", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "dep", "cur"];
+  const FILTER_ORDER = ["field", "task", "lang", "site", "owner", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "dep", "cur"];
   // pay basis: one at a time, a per-hour and a per-task figure do not belong on the same axis
   const BASES = {
     hour: { label: "Per hour", unit: "/hr", axis: "Top of hourly rate (US$)", title: "Hourly pay", color: "pay",
@@ -34,7 +34,7 @@
   const UNIT = { hour: "/hr", year: "/year", month: "/month", project: " per project", task: " per task", session: " per session" };
   const DEFAULTS = { basis: "hour", x: "field", color: "pay", sort: "auto", scale: "log" };
 
-  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE, LOGOS;
+  let DIMS, DI, JOBS, SNAPSHOT, POSTINGS, COUNTRIES, FXDATE, LOGOS, OWNERS;
   // POINTS: what the chart can draw. Each job is one point at the top of its pay; a range also has a second point at its
   // bottom ("Range (min)" under "How pay is stated"), which inherits everything else from its job. The table lists jobs.
   let POINTS, OFF;
@@ -42,7 +42,7 @@
   const jobsOf = (pts) => { const seen = new Set(); return pts.map(jobOf).filter((j) => !seen.has(j) && seen.add(j)); };
   const LOGO = 16, LOGO_GAP = 5; // logo size and the space after it, in px
   // small logo of a site, shown before its name (decorative: the name follows, so no alt text)
-  const logoSrc = (key, value) => (key === "site" && LOGOS[value]) || null;
+  const logoSrc = (key, value) => ((key === "site" || key === "owner") && LOGOS[value]) || null;
   const logoImg = (key, value) => {
     const src = logoSrc(key, value);
     return src ? `<img class="logo" src="${esc(src)}" alt="" width="${LOGO}" height="${LOGO}" decoding="async" onerror="this.remove()">` : "";
@@ -71,6 +71,7 @@
     POSTINGS = data.postings;
     FXDATE = data.fx && data.fx.date;
     LOGOS = data.logos || {};
+    OWNERS = data.owners || {};
     for (const j of JOBS) j.text = [j.t, j.co, j.s, ...j.loc, ...j.pl, ...(j.lg || [])].join(" ").toLowerCase();
     // values a filter leaves out until ticked (the bottom of ranges): the default view shows each job once
     OFF = Object.fromEntries(DIMS.filter((d) => d.off).map((d) => [d.key, new Set(d.off.map((v) => d.values.indexOf(v)))]));
@@ -239,7 +240,7 @@
   }
 
   // short names for the filter buttons (the popover shows the full name and what it means)
-  const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", task: "Task", lang: "Language", site: "Site", kind: "Site type", who: "Who can apply",
+  const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", task: "Task", lang: "Language", site: "Site", owner: "Company", kind: "Site type", who: "Who can apply",
     mode: "Work mode", degree: "Degree", years: "Experience", contract: "Job type", unit: "Paid per", pay: "Pay clarity", dep: "Rate set by", cur: "Currency" };
   const SMALL = matchMedia("(max-width: 720px)");
 
@@ -261,7 +262,7 @@
       return b;
     };
     const box = $("#filters");
-    for (const id of ["live", "field", "task", "lang", "site", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
+    for (const id of ["live", "field", "task", "lang", "site", "owner", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
     // filters about pay sit with the pay switch (the range's unit follows it); on a phone they lead the scrolling filter row
     const payFilters = ["pay$", "unit", "pay", "dep", "cur"].map(mk);
     const payBox = document.createElement("div");
@@ -1081,6 +1082,7 @@
       ["Field", why(val(j, "field"), "Field")],
       ["Kind of task", why(val(j, "task"), "Kind of task")],
       ["Languages", ev["Languages"] ? why(ev["Languages"], "Languages, as written") : ""],
+      ["Company behind it", val(j, "owner") !== j.s || OWNERS[j.s] ? val(j, "owner") + (OWNERS[j.s] ? ` (${OWNERS[j.s]})` : "") : ""],
       ["Type of site", val(j, "kind")],
       ["Places listed", j.loc.length ? j.loc.join("; ") + (j.nloc > j.loc.length ? ` and ${j.nloc - j.loc.length} more` : "") : ""],
       ["Countries read", j.pl.join(", ")],

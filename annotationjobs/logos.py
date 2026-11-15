@@ -35,6 +35,7 @@ DOMAINS = {
     "Labelbox": "labelbox.com", "Lionbridge": "lionbridge.com", "Magic": "magic.dev", "Mercor": "mercor.com",
     "Mercor (staff board)": "mercor.com", "Midjourney": "midjourney.com", "Mindrift (Toloka)": "mindrift.ai",
     "Meridial (Invisible)": "meridial.ai", "HumanSignal": "humansignal.com",
+    "RWS": "rws.com", "Handshake": "joinhandshake.com",
     "Mistral AI": "mistral.ai", "NVIDIA": "nvidia.com", "OneForma": "oneforma.com", "OpenAI": "openai.com",
     "Outlier": "outlier.ai", "Pareto.AI": "pareto.ai", "Perplexity": "perplexity.ai",
     "Physical Intelligence": "physicalintelligence.company", "Poolside": "poolside.ai", "Prolific": "prolific.com",

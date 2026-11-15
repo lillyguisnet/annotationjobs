@@ -5,6 +5,32 @@ import re
 KIND_NAME = {"marketplace": "Contributor platform", "vendor": "Data company's own board", "lab": "AI lab / AI company",
              "bigtech": "Big tech"}
 
+# The company behind each site, where it is not the site itself: site -> (company, what is known and where
+# it was read). Checked 2026-11-15 on the sites' own pages and Wikipedia. Other sites are their own company.
+OWNERS = {
+    "Outlier": ("Scale AI", "Outlier is Scale AI's contributor platform (Outlier's site; Wikipedia). Meta owns 49% of Scale AI, without votes (June 2025)."),
+    "Remotasks": ("Scale AI", "Remotasks is Scale AI's contributor platform (Wikipedia). Meta owns 49% of Scale AI, without votes (June 2025)."),
+    "Scale AI": ("Scale AI", "Meta owns 49% of Scale AI, without votes (June 2025, Wikipedia)."),
+    "DataAnnotation": ("Surge AI", "Reported by The Verge and New York Magazine (2023, via Wikipedia) to be Surge AI's platform; DataAnnotation's site does not name its owner."),
+    "Alignerr": ("Labelbox", "\u201cAlignerr | Powered by Labelbox\u201d (Alignerr's site)."),
+    "Mindrift (Toloka)": ("Toloka", "Mindrift is Toloka's platform for its contributors; Toloka is part of Nebius Group, formerly Yandex (Mindrift's site; Wikipedia)."),
+    "Toloka": ("Toloka", "Toloka is part of Nebius Group, formerly Yandex (Wikipedia)."),
+    "Meridial (Invisible)": ("Invisible Technologies", "\u201cMeridial by Invisible\u201d (Meridial's site)."),
+    "Invisible Technologies": ("Invisible Technologies", ""),
+    "OneForma": ("Centific", "OneForma names Centific as its company (OneForma's site)."),
+    "RWS (TrainAI)": ("RWS", "TrainAI is RWS's AI data service (RWS's site)."),
+    "Handshake AI": ("Handshake", "Handshake AI is a program of Handshake, the student careers network (Handshake's site)."),
+    "Handshake (staff board)": ("Handshake", ""),
+    "Mercor (staff board)": ("Mercor", ""),
+    "Google / DeepMind": ("Google", ""), "Google DeepMind": ("Google", ""),
+    "Lionbridge": ("Lionbridge", "Lionbridge belongs to the investment firm H.I.G. Capital; it sold its AI-training unit, Lionbridge AI, to TELUS in 2020 (Wikipedia)."),
+}
+
+
+def owner_of(site):
+    """(company behind the site, note)."""
+    return OWNERS.get(site, (site, ""))
+
 LANGS = ("Spanish|French|German|Italian|Portuguese|Japanese|Korean|Chinese|Mandarin|Cantonese|Arabic|Hindi|Bengali|Urdu|Punjabi|"
          "Tamil|Telugu|Marathi|Gujarati|Kannada|Malayalam|Russian|Ukrainian|Polish|Czech|Slovak|Hungarian|Romanian|Bulgarian|"
          "Greek|Turkish|Hebrew|Persian|Farsi|Dutch|Flemish|Swedish|Norwegian|Danish|Finnish|Icelandic|Estonian|Latvian|"
