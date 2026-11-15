@@ -22,10 +22,10 @@ with a language model (it needs `lm15` and runs through `uv`, see below). Charts
 ## Public page
 
 `docs/` is the public page (GitHub Pages, served from `docs/` on `main`): a box plot of the top of each
-job's pay range in US$, grouped and colored by any of site, company behind it, type of site, field, kind of task, language, degree, experience, work
-mode, who can apply, kind of job, what the pay is per, how it is stated (one figure, a range, or only "up to"; a range is plotted at its top, and
-"Range (min)" adds a second dot at its bottom),
-what the listing says it depends on, and its currency, with filters
+job's pay range in US$, grouped and colored by any of field, task, language, site, company, site type, who can apply, work mode,
+degree, experience, job type, what the pay is per ("paid per"), how clearly it is stated ("pay clarity": one figure, a range, or only "up to";
+a range is plotted at its top, and "Range (min)" adds a second dot at its bottom), what the listing says it depends on ("pay factors"),
+and its currency, with filters (same names and order as the groupings, set once in `DIMS` in `annotationjobs/site.py`)
 (including "open to people in <country>") shared by the chart and the table below it. A switch shows one
 pay basis at a time: per hour, per task or project (task, project, session), or jobs with no pay figure.
 The view is kept in the address, so a link reopens it.

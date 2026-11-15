@@ -53,34 +53,35 @@ RULE_CODE = {"only listed places": "only", "anywhere": "any", "anywhere except e
 COUNTRY_NAMES = set(COUNTRIES) | set(ISO.values())
 CUR = ["US$ (stated)", "\"$\" on a US-only job", "\"$\" assumed to be US$", "Converted from another currency", "No pay figure"]
 
-# key, label, help, values (in their natural order), ordinal (natural order means something)
+# key, label, help, values (in their natural order), ordinal (natural order means something).
+# The page uses this order and these labels everywhere: filter buttons, chart groupings, legend, table, CSV.
 DIMS = [
-    ("site", "Site", "Where the job is posted.", None, False),
-    ("owner", "Company behind it", "The company that runs the site. Several sites are one company: Outlier and Remotasks "
-     "are Scale AI's, DataAnnotation is Surge AI's (reported by the press; the site does not say), Alignerr is Labelbox's, "
-     "Mindrift is Toloka's, Meridial is Invisible Technologies', OneForma is Centific's. Open a job to see the source.",
-     None, False),
-    ("kind", "Type of site", "Contributor platforms (Mercor, Outlier...), data companies' own job boards, AI labs, big tech.",
-     list(KIND_NAME.values()), False),
     ("field", "Field", "The specialist knowledge the job asks for, read from the full listing by a language model "
      "(GPT-6.1 Terra). Open a job in the table to see the sentences it used.",
      [n for n, _ in C.FIELDS.values()] + [C.NOT_SORTED], False),
-    ("task", "Kind of task", "What the work mainly is, read from the full listing by a language model (GPT-6.1 Terra).",
+    ("task", "Task", "What the work mainly is, read from the full listing by a language model (GPT-6.1 Terra).",
      [n for n, _ in C.TASKS.values()] + [C.NOT_SORTED], False),
     ("lang", "Language", "The language other than English the job requires. Jobs asking for two or more are under "
      "\u201cSeveral languages\u201d; the search box finds each language.", None, False),
-    ("degree", "Degree mentioned", "Highest degree the listing mentions (mentioned, not necessarily required).", DEGREES, True),
-    ("years", "Experience asked", "Smallest number of years of experience the listing asks for.", YEARS, True),
-    ("mode", "Work mode", "Remote, hybrid or on site.", list(MODES.values()), False),
+    ("site", "Site", "Where the job is posted.", None, False),
+    ("owner", "Company", "The company that runs the site. Several sites are one company: Outlier and Remotasks "
+     "are Scale AI's, DataAnnotation is Surge AI's (reported by the press; the site does not say), Alignerr is Labelbox's, "
+     "Mindrift is Toloka's, Meridial is Invisible Technologies', OneForma is Centific's. Open a job to see the source.",
+     None, False),
+    ("kind", "Site type", "Contributor platforms (Mercor, Outlier...), data companies' own job boards, AI labs, big tech.",
+     list(KIND_NAME.values()), False),
     ("who", "Who can apply", "Whether the listing limits where you must live or work.", [n for _, n, _ in RULES], False),
-    ("contract", "Kind of job", "Contractor unless the listing says otherwise; permanent only when stated.",
+    ("mode", "Work mode", "Remote, hybrid or on site.", list(MODES.values()), False),
+    ("degree", "Degree", "Highest degree the listing mentions (mentioned, not necessarily required).", DEGREES, True),
+    ("years", "Experience", "Smallest number of years of experience the listing asks for.", YEARS, True),
+    ("contract", "Job type", "Contractor unless the listing says otherwise; permanent only when stated.",
      list(CONTRACTS.values()), False),
     ("unit", "Paid per", "What the pay figure is for. Salaries are shown per hour at 40 hours a week.",
      list(UNITS.values()), False),
-    ("pay", "How pay is stated", "One figure (you know the rate), a range (you don't know where in it you will be), or only an \"up to\" "
+    ("pay", "Pay clarity", "One figure (you know the rate), a range (you don't know where in it you will be), or only an \"up to\" "
      "(likely less). A range is a dot at its top, \"Range (max)\"; tick \"Range (min)\" to add a dot at its bottom. "
-     "A few one-figure listings still say the rate depends on something: see \"What sets the rate\".", PAY, False),
-    ("dep", "What sets the rate", "What the listing says the pay depends on, next to the figure. A range on its own does not say.",
+     "A few one-figure listings still say the rate depends on something: see \"Pay factors\".", PAY, False),
+    ("dep", "Pay factors", "What the listing says the pay depends on, next to the figure. A range on its own does not say.",
      None, False),
     ("cur", "Currency", "\"$\" with no currency is taken as US$; other currencies are converted at the day's rate.", CUR, False),
 ]

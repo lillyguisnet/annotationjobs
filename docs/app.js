@@ -18,7 +18,7 @@
     "#1d2b53", "#8a8f1c", "#7a1f3d"];
   const RAMP = d3.interpolateRgbBasis(["#f2b134", "#e4572e", "#b8336a", "#5b2a86", "#16324f"]);
   const NEUTRAL = new Set(["Not sorted yet", "English only", "Not stated", "None mentioned", "Nothing about pay", "No pay figure", "Amount, unit not stated", "Not said"]);
-  const FILTER_ORDER = ["field", "task", "lang", "site", "owner", "kind", "degree", "years", "mode", "who", "contract", "unit", "pay", "dep", "cur"];
+  const PAY_DIMS = new Set(["unit", "pay", "dep", "cur"]); // filters that sit with the pay switch
   // pay basis: one at a time, a per-hour and a per-task figure do not belong on the same axis
   const BASES = {
     hour: { label: "Per hour", unit: "/hr", axis: "Top of hourly rate (US$)", title: "Hourly pay", color: "pay",
@@ -36,7 +36,7 @@
 
   let DIMS, DI, JOBS, SNAPSHOT, COLLECTED_FROM, POSTINGS, COUNTRIES, FXDATE, LOGOS, OWNERS;
   // POINTS: what the chart can draw. Each job is one point at the top of its pay; a range also has a second point at its
-  // bottom ("Range (min)" under "How pay is stated"), which inherits everything else from its job. The table lists jobs.
+  // bottom ("Range (min)" under "Pay clarity"), which inherits everything else from its job. The table lists jobs.
   let POINTS, OFF;
   const jobOf = (p) => p.job || p;
   const jobsOf = (pts) => { const seen = new Set(); return pts.map(jobOf).filter((j) => !seen.has(j) && seen.add(j)); };
@@ -249,9 +249,9 @@
     });
   }
 
-  // short names for the filter buttons (the popover shows the full name and what it means)
-  const BTN = { live: "Open to people in", "pay$": "Pay range", field: "Field", task: "Task", lang: "Language", site: "Site", owner: "Company", kind: "Site type", who: "Who can apply",
-    mode: "Work mode", degree: "Degree", years: "Experience", contract: "Job type", unit: "Paid per", pay: "Pay clarity", dep: "Rate set by", cur: "Currency" };
+  // filter button names: a grouping's own label (the same in the chart, legend and table), in the data's order
+  const BTN_EXTRA = { live: "Open to people in", "pay$": "Pay range" };
+  const btnName = (id) => BTN_EXTRA[id] || DIMS[DI[id]].label;
   const SMALL = matchMedia("(max-width: 720px)");
 
   function buildFilterButtons() {
@@ -272,9 +272,9 @@
       return b;
     };
     const box = $("#filters");
-    for (const id of ["live", "field", "task", "lang", "site", "owner", "kind", "who", "mode", "degree", "years", "contract"]) box.appendChild(mk(id));
+    for (const id of ["live", ...DIMS.map((d) => d.key).filter((k) => !PAY_DIMS.has(k))]) box.appendChild(mk(id));
     // filters about pay sit with the pay switch (the range's unit follows it); on a phone they lead the scrolling filter row
-    const payFilters = ["pay$", "unit", "pay", "dep", "cur"].map(mk);
+    const payFilters = ["pay$", ...DIMS.map((d) => d.key).filter((k) => PAY_DIMS.has(k))].map(mk);
     const payBox = document.createElement("div");
     payBox.className = "filters pay-filters";
     zone.appendChild(payBox);
@@ -286,7 +286,7 @@
   function refreshFilterButtons() {
     for (const b of document.querySelectorAll(".fbtn")) {
       const id = b.dataset.f;
-      let on = false, label = BTN[id], badge = "";
+      let on = false, label = btnName(id), badge = "";
       if (id === "live") { if (S.live) { on = true; label = "Open to people in " + S.live; } }
       else if (id === "pay$") {
         b.hidden = S.basis === "none";
@@ -294,11 +294,11 @@
       } else if (S.f[id]) {
         on = true;
         const t = filterText(id);
-        if (t) label = `${BTN[id]}: ${t.length > 24 ? t.slice(0, 23) + "…" : t}`;
+        if (t) label = `${btnName(id)}: ${t.length > 24 ? t.slice(0, 23) + "…" : t}`;
         else badge = S.f[id].size;
       }
       b.classList.toggle("on", on);
-      b.title = on ? `${DIMS[DI[id]]?.label || BTN[id]}: click to change` : "";
+      b.title = on ? `${btnName(id)}: click to change` : "";
       b.innerHTML = `<span class="l">${esc(label)}</span>${badge ? `<span class="badge">${badge}</span>` : ""}<span class="caret"></span>`;
     }
   }
@@ -1102,15 +1102,15 @@
       ["Earnings claim (not used)", ev["Earnings claim (not used)"]],
       ["Who can apply", whoText(j) + (ev["Who can apply"] ? ` (${ev["Who can apply"]})` : "")],
       ["Work mode", why(val(j, "mode"), "Work mode")],
-      ["Kind of job", why(val(j, "contract"), "Kind of job")],
-      ["Experience asked", why(val(j, "years"), "Experience")],
+      ["Job type", why(val(j, "contract"), "Kind of job")],
+      ["Experience", why(val(j, "years"), "Experience")],
       ["Degrees mentioned", ev["Degrees mentioned"]],
       ["Hours per week", ev["Hours per week"]],
       ["Field", why(val(j, "field"), "Field")],
-      ["Kind of task", why(val(j, "task"), "Kind of task")],
+      ["Task", why(val(j, "task"), "Kind of task")],
       ["Languages", ev["Languages"] ? why(ev["Languages"], "Languages, as written") : ""],
-      ["Company behind it", val(j, "owner") !== j.s || OWNERS[j.s] ? val(j, "owner") + (OWNERS[j.s] ? ` (${OWNERS[j.s]})` : "") : ""],
-      ["Type of site", val(j, "kind")],
+      ["Company", val(j, "owner") !== j.s || OWNERS[j.s] ? val(j, "owner") + (OWNERS[j.s] ? ` (${OWNERS[j.s]})` : "") : ""],
+      ["Site type", val(j, "kind")],
       ["Places listed", j.loc.length ? j.loc.join("; ") + (j.nloc > j.loc.length ? ` and ${j.nloc - j.loc.length} more` : "") : ""],
       ["Countries read", j.pl.join(", ")],
     ].filter(([, v]) => v);
